@@ -5,25 +5,16 @@ import { loginUser, logoutUser, checkAuthStatus, clearError } from '../store/sli
 
 export const useAuth = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { user, isLoading, error, isAuthenticated } = useSelector(
+  const { user, isLoading, error, isAuthenticated, isInitialized } = useSelector(
     (state: RootState) => state.auth
   );
 
   useEffect(() => {
-    // Check if user is already authenticated on app start
-    // Only run if we're not already loading and not authenticated
-    if (!isAuthenticated && !isLoading) {
-      // Add error handling to prevent app crashes
-      try {
-        dispatch(checkAuthStatus()).catch((error) => {
-          console.warn('Auth check failed, user will need to login:', error);
-          // Don't throw - just let the user go to login
-        });
-      } catch (error) {
-        console.warn('Auth check error:', error);
-      }
+    // Only run the initial auth check if it hasn't been done yet.
+    if (!isInitialized) {
+      dispatch(checkAuthStatus());
     }
-  }, [dispatch, isAuthenticated, isLoading]);
+  }, [dispatch, isInitialized]);
 
   const login = useCallback(async (username: string, password: string) => {
     const result = await dispatch(loginUser({ username, password }));
@@ -43,6 +34,7 @@ export const useAuth = () => {
     isLoading,
     error,
     isAuthenticated,
+    isInitialized,
     login,
     logout,
     clearAuthError,
