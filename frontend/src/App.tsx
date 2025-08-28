@@ -34,128 +34,107 @@ const queryClient = new QueryClient({
   },
 });
 
-// App content with routing - this runs inside the Redux provider
-const AppContent: React.FC = () => {
-  console.log('AppContent: Starting AppContent component');
-  
-  try {
-    console.log('AppContent: Getting theme from Redux store...');
-    const { theme: themeMode } = useSelector((state: RootState) => state.ui);
-    console.log('AppContent: Theme mode:', themeMode);
-    
-    console.log('AppContent: Creating theme...');
-    const currentTheme = getTheme(themeMode);
-    console.log('AppContent: Theme created:', currentTheme);
+// Themed App Routes component that uses the UI state for theme
+const ThemedAppRoutes: React.FC = () => {
+  const { theme: themeMode } = useSelector((state: RootState) => state.ui);
+  const currentTheme = getTheme(themeMode);
 
-    console.log('AppContent: Rendering theme provider and router...');
-    return (
+  return (
     <ThemeProvider theme={currentTheme}>
       <CssBaseline />
       <Router>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          
-          {/* Protected routes with layout */}
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/utilities"
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Utilities />
-                </Layout>
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Settings />
-                </Layout>
-              </PrivateRoute>
-            }
-          />
-          
-          {/* Workflow routes */}
-          <Route
-            path="/workflows"
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <WorkflowTemplate 
-                    title="Workflows"
-                    description="Select and manage your AI workflows"
-                    status="active"
-                  >
-                    <WorkflowList />
-                  </WorkflowTemplate>
-                </Layout>
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/workflows/email-assistant"
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <EmailAssistant />
-                </Layout>
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/workflows/document-analyzer"
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <DocumentAnalyzer />
-                </Layout>
-              </PrivateRoute>
-            }
-          />
-          
-          {/* Default redirects - FIXED: redirect to login first, let PrivateRoute handle dashboard redirect */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Router>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+
+              {/* Protected routes with layout */}
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Dashboard />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/utilities"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Utilities />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Settings />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+
+              {/* Workflow routes */}
+              <Route
+                path="/workflows"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <WorkflowTemplate
+                        title="Workflows"
+                        description="Select and manage your AI workflows"
+                        status="active"
+                      >
+                        <WorkflowList />
+                      </WorkflowTemplate>
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/workflows/email-assistant"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <EmailAssistant />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/workflows/document-analyzer"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <DocumentAnalyzer />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+
+              {/* Default redirects */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Router>
     </ThemeProvider>
   );
-  } catch (error) {
-    console.error('AppContent: Error in AppContent:', error);
-    return <div style={{padding: '20px', color: 'red'}}>AppContent Error: {String(error)}</div>;
-  }
 };
 
 // Main App component with providers
 const App: React.FC = () => {
-  console.log('App.tsx: App component rendering');
-  
-  try {
-    console.log('App.tsx: Creating Redux Provider with store:', store);
-    return (
-      <Provider store={store}>
-        <QueryClientProvider client={queryClient}>
-          <AppContent />
-        </QueryClientProvider>
-      </Provider>
-    );
-  } catch (error) {
-    console.error('App.tsx: Error in App component:', error);
-    return <div>Error loading app: {String(error)}</div>;
-  }
+  return (
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <ThemedAppRoutes />
+      </QueryClientProvider>
+    </Provider>
+  );
 };
 
 export default App;
