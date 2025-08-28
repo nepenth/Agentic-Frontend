@@ -8,13 +8,15 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isInitialized } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
+  // Show loading spinner if auth state is still being determined
+  if (!isInitialized || isLoading) {
     return <LoadingSpinner fullScreen message="Checking authentication..." />;
   }
 
+  // If initialization is complete and user is not authenticated, redirect
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
