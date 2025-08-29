@@ -210,7 +210,11 @@ const SystemHealth: React.FC = () => {
   }
 
   return (
-    <Box>
+    <Box sx={{
+      minHeight: '100%',
+      overflow: 'auto',
+      paddingBottom: 4
+    }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
@@ -529,7 +533,7 @@ const SystemHealth: React.FC = () => {
 
         {/* GPU Details */}
         <Grid item xs={12}>
-          <Card elevation={0}>
+          <Card elevation={0} sx={{ mb: 4 }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                 GPU Monitoring (Tesla P40 × 2)
@@ -559,48 +563,48 @@ const SystemHealth: React.FC = () => {
                       </Typography>
 
                       <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6} md={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider' }}>
+                        <Grid item xs={12} sm={6} md={4} lg={2}>
+                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
                             <Videocam sx={{ fontSize: 24, color: 'primary.main', mb: 1 }} />
                             <Typography variant="body2" color="text.secondary">Usage</Typography>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.usage}%</Typography>
                           </Paper>
                         </Grid>
 
-                        <Grid item xs={12} sm={6} md={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider' }}>
+                        <Grid item xs={12} sm={6} md={4} lg={2}>
+                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
                             <Memory sx={{ fontSize: 24, color: 'info.main', mb: 1 }} />
                             <Typography variant="body2" color="text.secondary">Memory</Typography>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.memoryUsed}GB/{gpu.memoryTotal}GB</Typography>
                           </Paper>
                         </Grid>
 
-                        <Grid item xs={12} sm={6} md={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider' }}>
+                        <Grid item xs={12} sm={6} md={4} lg={2}>
+                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
                             <DeviceThermostat sx={{ fontSize: 24, color: 'error.main', mb: 1 }} />
                             <Typography variant="body2" color="text.secondary">Temperature</Typography>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.temperature}°F</Typography>
                           </Paper>
                         </Grid>
 
-                        <Grid item xs={12} sm={6} md={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider' }}>
+                        <Grid item xs={12} sm={6} md={4} lg={2}>
+                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
                             <Speed sx={{ fontSize: 24, color: 'warning.main', mb: 1 }} />
                             <Typography variant="body2" color="text.secondary">GPU Freq</Typography>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.frequency}MHz</Typography>
                           </Paper>
                         </Grid>
 
-                        <Grid item xs={12} sm={6} md={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider' }}>
+                        <Grid item xs={12} sm={6} md={4} lg={2}>
+                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
                             <Timeline sx={{ fontSize: 24, color: 'success.main', mb: 1 }} />
                             <Typography variant="body2" color="text.secondary">Mem Freq</Typography>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.memoryFrequency}MHz</Typography>
                           </Paper>
                         </Grid>
 
-                        <Grid item xs={12} sm={6} md={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider' }}>
+                        <Grid item xs={12} sm={6} md={4} lg={2}>
+                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
                             <TrendingUp sx={{ fontSize: 24, color: 'secondary.main', mb: 1 }} />
                             <Typography variant="body2" color="text.secondary">Power</Typography>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.power}W</Typography>
