@@ -81,6 +81,10 @@ const TopBar: React.FC<TopBarProps> = ({ drawerWidth = 280 }) => {
     switch (pathname) {
       case '/dashboard':
         return 'Dashboard';
+      case '/system-health':
+        return 'System Health';
+      case '/agents':
+        return 'Agent Management';
       case '/utilities':
         return 'Backend Tools';
       case '/settings':

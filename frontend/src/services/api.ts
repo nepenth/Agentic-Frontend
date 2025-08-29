@@ -88,9 +88,14 @@ class ApiClient {
 
   // Authentication
   async login(username: string, password: string) {
-    const response = await this.client.post('/api/v1/auth/login', {
-      username,
-      password,
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+    
+    const response = await this.client.post('/api/v1/auth/login', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     });
     
     if (response.data.access_token) {

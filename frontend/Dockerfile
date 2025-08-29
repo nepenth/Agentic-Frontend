@@ -1,5 +1,5 @@
 # Multi-stage build for production
-FROM node:18-alpine AS build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
@@ -11,6 +11,12 @@ RUN npm ci --silent
 
 # Copy source code
 COPY . .
+
+# Set build-time environment variables
+ARG VITE_API_BASE_URL
+ARG VITE_WS_URL
+ARG VITE_APP_NAME
+ARG VITE_APP_VERSION
 
 # Build the app
 RUN npm run build

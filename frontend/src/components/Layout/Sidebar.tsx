@@ -27,6 +27,8 @@ import {
   ExpandLess,
   ExpandMore,
   Home,
+  Speed,
+  Engineering,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
 import { useSelector, useDispatch } from 'react-redux';
@@ -72,6 +74,21 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
       label: 'Dashboard',
       icon: <Dashboard />,
       primary: true,
+    },
+    {
+      type: 'divider',
+    },
+    {
+      type: 'item',
+      path: '/system-health',
+      label: 'System Health',
+      icon: <Speed />,
+    },
+    {
+      type: 'item',
+      path: '/agents',
+      label: 'Agent Management',
+      icon: <Engineering />,
     },
     {
       type: 'divider',

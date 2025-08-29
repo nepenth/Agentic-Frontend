@@ -13,6 +13,10 @@ export default defineConfig({
     sourcemap: true,
   },
   define: {
-    'process.env': process.env,
+    // Only expose VITE_ prefixed environment variables for security
+    'process.env.VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL),
+    'process.env.VITE_WS_URL': JSON.stringify(process.env.VITE_WS_URL),
+    'process.env.VITE_APP_NAME': JSON.stringify(process.env.VITE_APP_NAME),
+    'process.env.VITE_APP_VERSION': JSON.stringify(process.env.VITE_APP_VERSION),
   },
 })
