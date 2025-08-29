@@ -182,6 +182,53 @@ class ApiClient {
     return response.data;
   }
 
+  // Security endpoints
+  async getSecurityStatus() {
+    const response = await this.client.get('/api/v1/security/status');
+    return response.data;
+  }
+
+  async getSecurityHealth() {
+    const response = await this.client.get('/api/v1/security/health');
+    return response.data;
+  }
+
+  async getSecurityIncidents(params?: {
+    limit?: number;
+    severity?: string;
+    resolved?: boolean;
+    agent_id?: string;
+  }) {
+    const response = await this.client.get('/api/v1/security/incidents', { params });
+    return response.data;
+  }
+
+  async resolveSecurityIncident(incidentId: string, resolutionNotes: string) {
+    const response = await this.client.post(`/api/v1/security/incidents/${incidentId}/resolve`, {
+      resolution_notes: resolutionNotes,
+    });
+    return response.data;
+  }
+
+  async getSecurityLimits() {
+    const response = await this.client.get('/api/v1/security/limits');
+    return response.data;
+  }
+
+  async validateToolExecution(validationData: {
+    agent_id: string;
+    tool_name: string;
+    input_data: Record<string, any>;
+  }) {
+    const response = await this.client.post('/api/v1/security/validate-tool-execution', validationData);
+    return response.data;
+  }
+
+  async getAgentSecurityReport(agentId: string) {
+    const response = await this.client.get(`/api/v1/security/agents/${agentId}/report`);
+    return response.data;
+  }
+
   // Dashboard data
   async getDashboardSummary() {
     const response = await this.client.get('/api/v1/dashboard/summary');
