@@ -44,7 +44,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/api';
-import type { Agent } from '../types';
+import type { Agent, OllamaModelNamesResponse } from '../types';
 
 interface CreateAgentForm {
   name: string;
@@ -69,16 +69,26 @@ const AgentManagement: React.FC = () => {
     system_prompt: 'You are a helpful AI assistant.',
   });
 
-  // Fetch agents
+  // Fetch agents with enhanced filtering
   const {
     data: agents,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['agents'],
+    queryKey: ['agents', formData], // Include filters in query key
     queryFn: () => apiClient.getAgents(),
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Fetch available Ollama models
+  const {
+    data: availableModels,
+    isLoading: modelsLoading,
+  } = useQuery<OllamaModelNamesResponse>({
+    queryKey: ['ollama-models'],
+    queryFn: () => apiClient.getOllamaModelNames(),
+    refetchInterval: 60000, // Refetch every minute
   });
 
   // Create agent mutation
@@ -447,11 +457,21 @@ const AgentManagement: React.FC = () => {
                   value={formData.model_name}
                   label="Model"
                   onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
+                  disabled={modelsLoading}
                 >
-                  <MenuItem value="qwen3:30b-a3b-thinking-2507-q8_0">Qwen 3 30B (Thinking)</MenuItem>
-                  <MenuItem value="qwen2.5:14b">Qwen 2.5 14B</MenuItem>
-                  <MenuItem value="llama3.1:8b">Llama 3.1 8B</MenuItem>
-                  <MenuItem value="mistral:7b">Mistral 7B</MenuItem>
+                  {modelsLoading ? (
+                    <MenuItem disabled>Loading models...</MenuItem>
+                  ) : (
+                    availableModels?.models?.map((model) => (
+                      <MenuItem key={model} value={model}>
+                        {model}
+                      </MenuItem>
+                    )) || (
+                      <MenuItem value="qwen3:30b-a3b-thinking-2507-q8_0">
+                        Qwen 3 30B (Thinking) - Default
+                      </MenuItem>
+                    )
+                  )}
                 </Select>
               </FormControl>
             </Grid>
@@ -537,11 +557,21 @@ const AgentManagement: React.FC = () => {
                   value={formData.model_name}
                   label="Model"
                   onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
+                  disabled={modelsLoading}
                 >
-                  <MenuItem value="qwen3:30b-a3b-thinking-2507-q8_0">Qwen 3 30B (Thinking)</MenuItem>
-                  <MenuItem value="qwen2.5:14b">Qwen 2.5 14B</MenuItem>
-                  <MenuItem value="llama3.1:8b">Llama 3.1 8B</MenuItem>
-                  <MenuItem value="mistral:7b">Mistral 7B</MenuItem>
+                  {modelsLoading ? (
+                    <MenuItem disabled>Loading models...</MenuItem>
+                  ) : (
+                    availableModels?.models?.map((model) => (
+                      <MenuItem key={model} value={model}>
+                        {model}
+                      </MenuItem>
+                    )) || (
+                      <MenuItem value="qwen3:30b-a3b-thinking-2507-q8_0">
+                        Qwen 3 30B (Thinking) - Default
+                      </MenuItem>
+                    )
+                  )}
                 </Select>
               </FormControl>
             </Grid>

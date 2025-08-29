@@ -28,8 +28,8 @@ FROM nginx:alpine AS production
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy SSL certificates
-COPY ssl/localhost.crt /etc/ssl/certs/localhost.crt
-COPY ssl/localhost.key /etc/ssl/private/localhost.key
+COPY ssl/fullchain.pem /etc/ssl/certs/fullchain.pem
+COPY ssl/privkey.pem /etc/ssl/private/privkey.pem
 
 # Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
