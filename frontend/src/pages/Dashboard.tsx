@@ -31,6 +31,7 @@ import {
   Info,
   PlayArrow,
   Circle,
+  Shield,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../services/api';
@@ -83,9 +84,19 @@ const Dashboard: React.FC = () => {
     refetchInterval: 30000,
   });
 
+  // Fetch security status
+  const {
+    data: securityStatus,
+    isLoading: securityLoading,
+  } = useQuery({
+    queryKey: ['security-status'],
+    queryFn: () => apiClient.getSecurityStatus(),
+    refetchInterval: 30000,
+  });
+
   // Mock system health for now (will be replaced with real metrics)
   const systemHealth = 'healthy';
-  const isLoading = agentsLoading || tasksLoading;
+  const isLoading = agentsLoading || tasksLoading || securityLoading;
   const error = agentsError || tasksError;
 
   // Calculate dashboard data from real API responses
@@ -356,6 +367,78 @@ const Dashboard: React.FC = () => {
                      </Box>
                      <LinearProgress variant="determinate" value={47} sx={{ height: 4, borderRadius: 2 }} />
                    </Box>
+                 </>
+               )}
+             </CardContent>
+           </Card>
+         </Grid>
+
+         <Grid item xs={12} sm={6} lg={3}>
+           <Card elevation={0} sx={{ height: '100%' }}>
+             <CardContent>
+               {isLoading ? (
+                 <CardSkeleton lines={4} />
+               ) : (
+                 <>
+                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                     <Typography color="text.secondary" gutterBottom variant="h6">
+                       Security Status
+                     </Typography>
+                     <Shield sx={{ fontSize: 32, color: securityStatus?.active_agents && securityStatus.active_agents > 0 ? 'success.main' : 'warning.main' }} />
+                   </Box>
+
+                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                     <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
+                       {securityStatus?.active_agents || 0}
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                       agents secured
+                     </Typography>
+                   </Box>
+
+                   {/* Security Incidents */}
+                   <Box sx={{ mb: 2 }}>
+                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                       <Typography variant="body2" color="text.secondary">Active Incidents</Typography>
+                       <Typography variant="body2" sx={{ fontWeight: 600, color: securityStatus?.total_incidents && securityStatus.total_incidents > 0 ? 'warning.main' : 'success.main' }}>
+                         {securityStatus?.total_incidents || 0}
+                       </Typography>
+                     </Box>
+                     {securityStatus?.total_incidents && securityStatus.total_incidents > 0 ? (
+                       <LinearProgress
+                         variant="determinate"
+                         value={Math.min(securityStatus.total_incidents * 10, 100)}
+                         sx={{ height: 4, borderRadius: 2 }}
+                         color="warning"
+                       />
+                     ) : (
+                       <LinearProgress
+                         variant="determinate"
+                         value={100}
+                         sx={{ height: 4, borderRadius: 2 }}
+                         color="success"
+                       />
+                     )}
+                   </Box>
+
+                   {/* Resource Limits */}
+                   <Box sx={{ mb: 2 }}>
+                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                       Limits: {securityStatus?.resource_limits?.max_concurrent_agents || 8} agents max
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                       Memory: {securityStatus?.resource_limits?.max_memory_mb ? Math.round(securityStatus.resource_limits.max_memory_mb / 1024) : 128}GB limit
+                     </Typography>
+                   </Box>
+
+                   <Button
+                     variant="outlined"
+                     size="small"
+                     onClick={() => navigate('/security')}
+                     sx={{ width: '100%' }}
+                   >
+                     View Security Center
+                   </Button>
                  </>
                )}
              </CardContent>

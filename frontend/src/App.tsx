@@ -17,6 +17,7 @@ import WorkflowList from './components/WorkflowList';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SystemHealth from './pages/SystemHealth';
+import Security from './pages/Security';
 import AgentManagement from './pages/AgentManagement';
 import Utilities from './pages/Utilities';
 import Settings from './pages/Settings';
@@ -66,6 +67,16 @@ const ThemedAppRoutes: React.FC = () => {
                   <PrivateRoute>
                     <Layout>
                       <SystemHealth />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/security"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Security />
                     </Layout>
                   </PrivateRoute>
                 }

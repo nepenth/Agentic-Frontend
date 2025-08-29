@@ -83,6 +83,8 @@ const TopBar: React.FC<TopBarProps> = ({ drawerWidth = 280 }) => {
         return 'Dashboard';
       case '/system-health':
         return 'System Health';
+      case '/security':
+        return 'Security Center';
       case '/agents':
         return 'Agent Management';
       case '/utilities':

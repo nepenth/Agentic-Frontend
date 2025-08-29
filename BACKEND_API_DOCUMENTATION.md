@@ -56,10 +56,455 @@ If you set an `API_KEY` in your .env file:
 | `GET` | `/api/v1/security/status` | Current security status and metrics | ✅ |
 | `GET` | `/api/v1/security/agents/{agent_id}/report` | Agent-specific security reports | ✅ |
 | `POST` | `/api/v1/security/validate-tool-execution` | Pre-validate tool executions | ❌ |
-| `GET` | `/api/v1/security/incidents` | Security incident management | ✅ |
+| `GET` | `/api/v1/security/incidents` | Security incident management with filtering | ✅ |
 | `POST` | `/api/v1/security/incidents/{incident_id}/resolve` | Resolve security incidents | ✅ |
-| `GET` | `/api/v1/security/limits` | Current security limits | ✅ |
+| `GET` | `/api/v1/security/limits` | Current security limits and constraints | ✅ |
 | `GET` | `/api/v1/security/health` | Security service health check | ❌ |
+## 🛡️ Security Features Overview
+
+The Agentic Backend includes a comprehensive security framework designed specifically for dynamic agent execution in home-lab environments. The security system provides multiple layers of protection while maintaining flexibility for diverse agent workflows.
+
+### Core Security Components
+
+#### 1. **Schema Security Validation**
+- **Comprehensive Schema Analysis**: Validates agent schemas against security policies before registration
+- **Resource Limit Enforcement**: Ensures agent definitions stay within hardware constraints
+- **Tool Security Validation**: Verifies tool configurations for security compliance
+- **Data Model Security**: Validates database schemas for injection vulnerabilities
+- **Malicious Content Detection**: Scans schemas for potentially harmful patterns
+
+#### 2. **Execution Sandboxing**
+- **Agent Isolation**: Each agent runs in a controlled execution environment
+- **Resource Monitoring**: Tracks CPU, memory, and execution time usage
+- **Rate Limiting**: Prevents abuse through configurable rate limits
+- **Input Validation**: Validates all input data against security policies
+- **Execution Monitoring**: Real-time monitoring of agent activities
+
+#### 3. **Security Middleware**
+- **Request Validation**: Validates incoming requests for malicious patterns
+- **Agent Context Tracking**: Maintains security context throughout request lifecycle
+- **Automatic Cleanup**: Ensures proper cleanup of security resources
+- **Incident Logging**: Comprehensive logging of security events
+
+#### 4. **Home-Lab Optimized Limits**
+The security system is specifically tuned for your hardware configuration:
+- **CPU**: 32 cores (64 threads) with conservative agent limits
+- **Memory**: 158GB RAM with per-agent memory caps
+- **GPU**: 2x Tesla P40 with resource monitoring
+- **Network**: Controlled external API access with domain whitelisting
+
+### Security Levels
+
+The system supports three security enforcement levels:
+
+- **STRICT**: Maximum security with minimal flexibility
+- **MODERATE**: Balanced security and functionality (default)
+- **LENIENT**: Reduced restrictions for development
+### Security Limits and Constraints
+
+The security system enforces specific limits optimized for your home-lab hardware configuration (2x Xeon E5-2683 v4, 2x Tesla P40, 158GB RAM). These limits prevent system abuse while allowing flexible agent development.
+
+#### Resource Limits
+
+| Category | Limit | Description |
+|----------|-------|-------------|
+| **Concurrent Agents** | 8 max | Maximum agents running simultaneously |
+| **Agent Execution Time** | 30 minutes | Per-agent execution timeout |
+| **Pipeline Execution Time** | 10 minutes | Maximum pipeline processing time |
+| **Step Execution Time** | 5 minutes | Individual tool execution timeout |
+| **Agent Memory** | 8GB | Memory per agent instance |
+| **Total Memory** | 128GB | System-wide agent memory limit |
+| **Data Model Memory** | 1GB | Memory per custom data model |
+| **Table Rows** | 1M | Maximum rows per dynamic table |
+| **Concurrent Queries** | 20 | Simultaneous database queries |
+| **Query Execution Time** | 5 minutes | Database query timeout |
+| **External Requests/Hour** | 1,000 | API calls to external services |
+| **Request Size** | 1MB | Maximum input data size |
+| **GPU Memory** | 24GB | Per-GPU memory allocation |
+| **Concurrent GPU Tasks** | 4 | Simultaneous GPU operations |
+
+#### Schema Complexity Limits
+
+| Constraint | Limit | Purpose |
+|------------|-------|---------|
+| **Data Models** | 5 max | Prevent schema bloat |
+| **Fields per Model** | 20 max | Maintain performance |
+| **Pipeline Steps** | 10 max | Control processing complexity |
+| **Tools per Agent** | 8 max | Limit external integrations |
+| **JSON Nesting Depth** | 3 levels | Prevent complex structures |
+| **Field Name Length** | 63 chars | Database compatibility |
+
+#### Network Security
+
+**Allowed Domains** (default whitelist):
+- `localhost`, `127.0.0.1`
+- `api.openai.com`, `api.anthropic.com`
+- `api.groq.com`, `huggingface.co`
+- `cdn.jsdelivr.net`
+
+**Blocked Tool Types**:
+- `system_command` - Direct system access
+- `file_system` - Raw file operations
+- `network_scanner` - Network reconnaissance
+
+#### Rate Limiting
+
+- **Tool Execution**: 100 requests per hour per tool
+- **Agent Creation**: 10 agents per hour per user
+- **API Calls**: 1000 external requests per hour
+- **Database Queries**: 20 concurrent queries
+
+### Security Monitoring
+
+#### Real-time Metrics
+
+The security service provides comprehensive monitoring:
+
+```json
+GET /api/v1/security/status
+
+{
+  "active_agents": 3,
+  "total_incidents": 12,
+  "recent_incidents": [
+    {
+      "id": "sec_1699123456_abc123",
+      "agent_id": "agent-uuid",
+      "type": "RESOURCE_EXCEEDED",
+      "severity": "medium",
+      "timestamp": "2024-01-01T12:00:00Z"
+    }
+  ],
+  "resource_limits": {
+    "max_concurrent_agents": 8,
+    "max_memory_mb": 131072,
+    "max_execution_time": 1800
+  },
+  "current_usage": {
+    "active_agents": 3,
+### Security Incident Management
+
+The system provides comprehensive incident tracking and management capabilities to help administrators monitor and respond to security events.
+
+#### Incident Types and Response
+
+| Incident Type | Automatic Response | Manual Action Required |
+|---------------|-------------------|----------------------|
+| **Resource Exceeded** | Log incident, cleanup sandbox | Review agent configuration |
+| **Permission Denied** | Block request, log incident | Verify agent permissions |
+| **Malicious Content** | Disable agent, log critical incident | Security review required |
+| **Rate Limit Exceeded** | Temporary block, log incident | Monitor for abuse patterns |
+| **Schema Violation** | Reject registration, log incident | Fix schema issues |
+| **Execution Timeout** | Terminate execution, log incident | Optimize agent performance |
+
+#### Incident Management API
+
+**List Security Incidents:**
+```bash
+GET /api/v1/security/incidents?limit=50&severity=high&resolved=false
+```
+
+**Response:**
+```json
+{
+  "incidents": [
+    {
+      "incident_id": "sec_1699123456_abc123",
+      "agent_id": "agent-uuid",
+      "agent_type": "email_analyzer",
+      "violation_type": "MALICIOUS_CONTENT",
+      "severity": "critical",
+      "description": "SQL injection pattern detected in input",
+      "timestamp": "2024-01-01T12:00:00Z",
+      "resolved": false,
+      "resolution_notes": null
+    }
+  ],
+  "total_count": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+**Resolve Security Incident:**
+```bash
+POST /api/v1/security/incidents/sec_1699123456_abc123/resolve
+{
+  "resolution_notes": "Agent input validation updated to prevent SQL injection"
+}
+```
+
+#### Incident Filtering
+
+Query incidents with multiple filters:
+
+```bash
+# High severity incidents from last 24 hours
+GET /api/v1/security/incidents?severity=high&limit=100
+
+# Unresolved critical incidents
+GET /api/v1/security/incidents?severity=critical&resolved=false
+
+# Incidents for specific agent
+GET /api/v1/security/incidents?agent_id=agent-uuid
+```
+
+#### Security Health Monitoring
+
+**Security Service Health Check:**
+```bash
+GET /api/v1/security/health
+```
+
+**Response:**
+```json
+{
+  "status": "warning",
+  "message": "2 unresolved high/critical security incidents",
+  "metrics": {
+    "total_incidents": 15,
+    "active_agents": 5,
+    "unresolved_high_severity": 2
+  },
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+### Security Best Practices
+
+#### Agent Development
+
+1. **Input Validation**: Always validate input data before processing
+2. **Resource Awareness**: Monitor memory and CPU usage in development
+3. **Error Handling**: Implement proper error handling and logging
+4. **Schema Design**: Keep schemas simple and well-structured
+5. **Tool Selection**: Use approved tools and verify configurations
+
+#### Schema Security
+
+1. **Field Validation**: Use appropriate field types and constraints
+2. **Size Limits**: Set reasonable limits on data sizes
+3. **Access Control**: Implement proper permission boundaries
+4. **Regular Audits**: Review and update schemas regularly
+
+#### Tool Configuration
+
+1. **Authentication**: Always configure proper authentication for external tools
+2. **Rate Limiting**: Set appropriate rate limits for API calls
+3. **Timeout Settings**: Configure reasonable timeouts for operations
+4. **Error Handling**: Implement retry logic and error recovery
+
+#### Monitoring and Maintenance
+
+1. **Regular Monitoring**: Check security status and incidents daily
+2. **Log Analysis**: Review logs for unusual patterns
+3. **Performance Tuning**: Optimize agents for your hardware constraints
+4. **Security Updates**: Keep dependencies and configurations updated
+
+### Security Configuration
+
+#### Environment Variables
+
+```bash
+# Security level (strict, moderate, lenient)
+SECURITY_LEVEL=moderate
+
+# API key for authentication
+API_KEY=your-secure-api-key
+
+# Database security
+DB_SSL_MODE=require
+DB_CONNECTION_TIMEOUT=30
+
+# Network security
+ALLOWED_DOMAINS=localhost,api.openai.com,api.anthropic.com
+BLOCK_SUSPICIOUS_REQUESTS=true
+```
+
+#### Security Middleware Configuration
+
+The security middleware is automatically configured in `main.py`:
+
+```python
+# Add security middleware (order matters)
+app.add_middleware(RequestValidationMiddleware)
+app.add_middleware(AgentSecurityMiddleware)
+```
+
+This ensures all requests pass through security validation before reaching your application logic.
+
+    "total_memory_mb": 24576
+  }
+}
+```
+
+#### Agent-Specific Reports
+
+```json
+GET /api/v1/security/agents/{agent_id}/report
+
+{
+  "agent_id": "agent-uuid",
+  "agent_type": "email_analyzer",
+  "start_time": "2024-01-01T10:00:00Z",
+### Example 3: Security Testing and Validation
+
+**Test Security Status:**
+```bash
+# Check current security status
+curl http://localhost:8000/api/v1/security/status
+
+# Expected response shows active agents and incidents
+{
+  "active_agents": 2,
+  "total_incidents": 0,
+  "recent_incidents": [],
+  "resource_limits": {
+    "max_concurrent_agents": 8,
+    "max_memory_mb": 131072,
+    "max_execution_time": 1800
+  },
+  "current_usage": {
+    "active_agents": 2,
+    "total_memory_mb": 4096
+  }
+}
+```
+
+**Validate Tool Execution:**
+```bash
+# Pre-validate a tool execution
+curl -X POST http://localhost:8000/api/v1/security/validate-tool-execution \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "test-agent-id",
+    "tool_name": "llm_processor",
+    "input_data": {
+      "prompt": "Analyze this email for importance",
+      "max_tokens": 500
+    }
+  }'
+
+# Expected response
+{
+  "allowed": true,
+  "agent_id": "test-agent-id",
+  "tool_name": "llm_processor",
+  "validation_time": 1640995200.123
+}
+```
+
+**Monitor Agent Security:**
+```bash
+# Get agent security report
+curl http://localhost:8000/api/v1/security/agents/test-agent-id/report
+
+# Response includes security events and incidents
+{
+  "agent_id": "test-agent-id",
+  "agent_type": "email_analyzer",
+  "resource_usage": {
+    "memory_peak_mb": 1024,
+    "cpu_time_seconds": 120
+  },
+  "security_events": [],
+  "incidents": [],
+  "is_secure": true
+}
+```
+
+**Test Rate Limiting:**
+```bash
+# Attempt multiple rapid requests to test rate limiting
+for i in {1..5}; do
+  curl -X POST http://localhost:8000/api/v1/tasks/run \
+    -H "Content-Type: application/json" \
+    -d '{"agent_id": "test-agent", "input": {"type": "test"}}' &
+done
+
+# Check for rate limit incidents
+curl http://localhost:8000/api/v1/security/incidents?severity=low
+```
+
+  "resource_usage": {
+### 5. Security-Related Errors
+
+**429 Resource Limit Exceeded:**
+- **Cause**: Agent exceeded memory, CPU, or execution time limits
+- **Solution**: Check `/api/v1/security/agents/{agent_id}/report` for resource usage
+- **Prevention**: Optimize agent configuration and monitor resource usage
+
+**403 Tool Execution Denied:**
+- **Cause**: Tool execution blocked by security policy
+- **Solution**: Verify tool configuration and permissions
+- **Check**: Review security incidents: `GET /api/v1/security/incidents`
+
+**400 Malicious Content Detected:**
+- **Cause**: Input data contains suspicious patterns
+- **Solution**: Sanitize input data before sending to agent
+- **Prevention**: Implement client-side input validation
+
+**Security Service Unavailable:**
+- **Cause**: Security middleware or service not responding
+- **Solution**: Check security health: `GET /api/v1/security/health`
+- **Logs**: Review security service logs for errors
+
+**Agent Sandbox Initialization Failed:**
+- **Cause**: Unable to initialize secure execution environment
+- **Solution**: Check system resources and concurrent agent limits
+- **Status**: Monitor via `GET /api/v1/security/status`
+
+### 6. Rate Limiting Issues
+
+**Rate Limit Exceeded:**
+- **Cause**: Too many requests in short time period
+- **Solution**: Implement exponential backoff retry logic
+- **Limits**: Check current limits via `GET /api/v1/security/limits`
+
+**Tool-Specific Rate Limits:**
+- **Cause**: Individual tool rate limits exceeded
+- **Solution**: Space out tool executions or reduce frequency
+- **Monitoring**: Check tool execution metrics in agent reports
+
+    "memory_peak_mb": 2048,
+6. **Monitor Security**: Check `/api/v1/security/status` and `/api/v1/security/health` regularly
+7. **Review Incidents**: Monitor security incidents via `/api/v1/security/incidents`
+8. **Generate Agent-Specific Docs**: Use `/api/v1/agent-types/{type}/documentation`
+    "cpu_time_seconds": 450,
+    "execution_time": 1200
+  },
+  "security_events": [
+    {
+      "type": "RESOURCE_EXCEEDED",
+      "description": "Memory usage exceeded 2GB limit",
+      "timestamp": "2024-01-01T11:30:00Z"
+    }
+  ],
+  "incidents": [
+    {
+      "id": "sec_1699123456_abc123",
+      "type": "RESOURCE_EXCEEDED",
+      "severity": "medium",
+      "description": "Agent exceeded memory limits",
+      "timestamp": "2024-01-01T11:30:00Z"
+    }
+  ],
+  "is_secure": true
+}
+```
+
+
+### Security Violation Types
+
+| Violation Type | Description | Severity | Action |
+|----------------|-------------|----------|--------|
+| `RESOURCE_EXCEEDED` | Agent exceeds resource limits | Medium | Sandbox cleanup |
+| `PERMISSION_DENIED` | Unauthorized operation attempted | High | Request blocked |
+| `MALICIOUS_CONTENT` | Malicious input detected | Critical | Agent disabled |
+| `RATE_LIMIT_EXCEEDED` | Rate limit violations | Low | Temporary block |
+| `SCHEMA_VIOLATION` | Invalid schema detected | High | Registration denied |
+| `EXECUTION_TIMEOUT` | Agent execution timeout | Medium | Forced termination |
+
 
 ### � Documentation Endpoints
 

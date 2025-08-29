@@ -29,6 +29,7 @@ import {
   Home,
   Speed,
   Engineering,
+  Security,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
 import { useSelector, useDispatch } from 'react-redux';
@@ -83,6 +84,12 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
       path: '/system-health',
       label: 'System Health',
       icon: <Speed />,
+    },
+    {
+      type: 'item',
+      path: '/security',
+      label: 'Security Center',
+      icon: <Security />,
     },
     {
       type: 'item',
