@@ -40,23 +40,15 @@ import {
   Refresh,
   Gavel,
   Timeline,
-  Settings,
   ReportProblem,
-  VerifiedUser,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/api';
 import type {
-  SecurityStatus,
-  SecurityIncident,
-  SecurityHealth,
-  SecurityLimits,
-  AgentSecurityReport
+  SecurityIncident
 } from '../types';
 
 const Security: React.FC = () => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<SecurityIncident | null>(null);
@@ -201,7 +193,7 @@ const Security: React.FC = () => {
       case 'error':
         return <Error color="error" />;
       default:
-        return <Security color="info" />;
+        return <SecurityIcon color="info" />;
     }
   };
 
@@ -547,7 +539,7 @@ const Security: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {incidents?.incidents?.map((incident) => (
+                  {incidents?.incidents?.map((incident: SecurityIncident) => (
                     <TableRow key={incident.incident_id} hover>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

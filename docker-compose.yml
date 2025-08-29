@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: https://whyland-ai.nakedsun.xyz
-        VITE_WS_URL: wss://whyland-ai.nakedsun.xyz/ws
+        VITE_WS_URL: wss://whyland-ai.nakedsun.xyz:443/ws
         VITE_APP_NAME: Agentic Frontend
         VITE_APP_VERSION: 0.1.0
     restart: unless-stopped
@@ -15,7 +15,7 @@ services:
       - "3443:443"
     environment:
       - VITE_API_BASE_URL=https://whyland-ai.nakedsun.xyz
-      - VITE_WS_URL=wss://whyland-ai.nakedsun.xyz/ws
+      - VITE_WS_URL=wss://whyland-ai.nakedsun.xyz:443/ws
       - VITE_APP_NAME=Agentic Frontend
       - VITE_APP_VERSION=0.1.0
     volumes:

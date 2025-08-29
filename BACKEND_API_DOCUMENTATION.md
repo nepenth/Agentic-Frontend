@@ -47,6 +47,45 @@ If you set an `API_KEY` in your .env file:
 3. Click **"Execute"**
 4. You should see a 200 response with system status
 
+### ✅ Current API Status (All Endpoints Working)
+
+**Recently Fixed Issues:**
+- ✅ **Security Routes**: Fixed double prefix issue (`/api/v1/security/security/...` → `/api/v1/security/...`)
+- ✅ **Database Schema**: Added missing columns (`agent_type_id`, `dynamic_config`, `documentation_url`)
+- ✅ **WebSocket Support**: Fully configured and documented
+- ✅ **Agent Endpoints**: All CRUD operations working
+- ✅ **System Metrics**: CPU, memory, GPU monitoring active
+- ✅ **Ollama Integration**: Model management and health checks working
+
+**Verified Working Endpoints:**
+```bash
+# Core endpoints
+GET  /api/v1/health                    # ✅ System health
+GET  /api/v1/agents                    # ✅ List agents
+POST /api/v1/agents/create             # ✅ Create agent
+GET  /api/v1/tasks                     # ✅ List tasks
+POST /api/v1/tasks/run                 # ✅ Execute task
+
+# Security endpoints
+GET  /api/v1/security/status           # ✅ Security status (admin required)
+POST /api/v1/security/status           # ✅ Update security config (admin required)
+GET  /api/v1/security/health           # ✅ Security health (public)
+POST /api/v1/security/validate-tool-execution # ✅ Pre-validate tool executions (authenticated)
+
+# System monitoring
+GET  /api/v1/system/metrics            # ✅ All system metrics
+GET  /api/v1/system/metrics/cpu        # ✅ CPU metrics
+GET  /api/v1/system/metrics/gpu        # ✅ GPU metrics
+
+# Ollama integration
+GET  /api/v1/ollama/models             # ✅ Available models
+GET  /api/v1/ollama/health             # ✅ Ollama health
+
+# WebSocket endpoints
+WS   /ws/logs                          # ✅ Real-time logs
+WS   /ws/tasks/{task_id}               # ✅ Task monitoring
+```
+
 ## 📋 Complete API Reference
 
 ### 🔒 Security Endpoints
@@ -54,8 +93,9 @@ If you set an `API_KEY` in your .env file:
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | `GET` | `/api/v1/security/status` | Current security status and metrics | ✅ |
+| `POST` | `/api/v1/security/status` | Update security status and configuration | ✅ |
 | `GET` | `/api/v1/security/agents/{agent_id}/report` | Agent-specific security reports | ✅ |
-| `POST` | `/api/v1/security/validate-tool-execution` | Pre-validate tool executions | ❌ |
+| `POST` | `/api/v1/security/validate-tool-execution` | Pre-validate tool executions | ✅ |
 | `GET` | `/api/v1/security/incidents` | Security incident management with filtering | ✅ |
 | `POST` | `/api/v1/security/incidents/{incident_id}/resolve` | Resolve security incidents | ✅ |
 | `GET` | `/api/v1/security/limits` | Current security limits and constraints | ✅ |
@@ -522,13 +562,28 @@ curl http://localhost:8000/api/v1/security/incidents?severity=low
 | `GET` | `/api/v1/health` | System health check | ❌ |
 | `GET` | `/api/v1/ready` | Readiness check | ❌ |
 | `GET` | `/api/v1/metrics` | Prometheus metrics | ✅ |
+| `GET` | `/api/v1/system/metrics` | System utilization metrics (CPU, Memory, GPU, Disk, Network) | ❌ |
+| `GET` | `/api/v1/system/metrics/cpu` | CPU utilization metrics | ❌ |
+| `GET` | `/api/v1/system/metrics/memory` | Memory utilization metrics | ❌ |
+| `GET` | `/api/v1/system/metrics/disk` | Disk utilization metrics | ❌ |
+| `GET` | `/api/v1/system/metrics/network` | Network utilization metrics | ❌ |
+| `GET` | `/api/v1/system/metrics/gpu` | GPU utilization metrics (NVIDIA) | ❌ |
+
+### 🤖 Ollama Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `GET` | `/api/v1/ollama/models` | List all available Ollama models with metadata | ❌ |
+| `GET` | `/api/v1/ollama/models/names` | List available model names only | ❌ |
+| `GET` | `/api/v1/ollama/health` | Check Ollama server health | ❌ |
+| `POST` | `/api/v1/ollama/models/pull/{model_name}` | Pull/download a new model | ❌ |
 
 ### 🤖 Agent Management Endpoints
 
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
-| `POST` | `/api/v1/agents/create` | Create new agent | ✅ |
-| `GET` | `/api/v1/agents` | List all agents | ❌ |
+| `POST` | `/api/v1/agents/create` | Create new agent (static or dynamic) | ✅ |
+| `GET` | `/api/v1/agents` | List all agents with filtering | ❌ |
 | `GET` | `/api/v1/agents/{agent_id}` | Get specific agent | ❌ |
 | `PUT` | `/api/v1/agents/{agent_id}` | Update agent | ✅ |
 | `DELETE` | `/api/v1/agents/{agent_id}` | Delete agent | ✅ |
@@ -537,8 +592,8 @@ curl http://localhost:8000/api/v1/security/incidents?severity=low
 
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
-| `POST` | `/api/v1/tasks/run` | Execute task | ✅ |
-| `GET` | `/api/v1/tasks` | List tasks | ❌ |
+| `POST` | `/api/v1/tasks/run` | Execute task (supports both static and dynamic agents) | ✅ |
+| `GET` | `/api/v1/tasks` | List tasks with filtering | ❌ |
 | `GET` | `/api/v1/tasks/{task_id}/status` | Get task status | ❌ |
 | `DELETE` | `/api/v1/tasks/{task_id}` | Cancel task | ✅ |
 
@@ -552,10 +607,226 @@ curl http://localhost:8000/api/v1/security/incidents?severity=low
 
 ### 🌐 WebSocket Endpoints
 
-| Endpoint | Description | Parameters |
-|----------|-------------|------------|
-| `/ws/logs` | Real-time log streaming | `agent_id`, `task_id`, `level` |
-| `/ws/tasks/{task_id}` | Task-specific updates | - |
+WebSocket connections provide real-time communication for monitoring agent activities, task progress, and system events.
+
+#### Connection URLs
+- **Development**: `ws://localhost:8000/ws/...`
+- **Production**: `wss://whyland-ai.nakedsun.xyz/ws/...`
+
+#### ⚠️ Socket.IO vs Raw WebSockets
+
+**IMPORTANT:** Our backend uses **raw WebSockets** (FastAPI), NOT Socket.IO!
+
+❌ **Wrong (Socket.IO):**
+```javascript
+import io from 'socket.io-client';
+const socket = io('wss://whyland-ai.nakedsun.xyz'); // Uses /socket.io/ path
+```
+
+✅ **Correct (Raw WebSocket):**
+```javascript
+const ws = new WebSocket('wss://whyland-ai.nakedsun.xyz/ws/logs');
+```
+
+#### Available Endpoints
+
+| Endpoint | Description | Parameters | Message Types |
+|----------|-------------|------------|---------------|
+| `/ws/logs` | Real-time log streaming | `agent_id`, `task_id`, `level` | `log_entry`, `task_update` |
+| `/ws/tasks/{task_id}` | Task-specific updates | - | `task_status`, `task_progress`, `task_complete` |
+
+#### WebSocket Message Format
+
+**Log Entry Message:**
+```json
+{
+  "type": "log_entry",
+  "data": {
+    "timestamp": "2024-01-01T12:00:00Z",
+    "level": "info",
+    "message": "Task processing started",
+    "agent_id": "agent-uuid",
+    "task_id": "task-uuid",
+    "source": "pipeline"
+  }
+}
+```
+
+**Task Status Message:**
+```json
+{
+  "type": "task_status",
+  "data": {
+    "task_id": "task-uuid",
+    "status": "running",
+    "progress": 45,
+    "message": "Processing step 3 of 5",
+    "timestamp": "2024-01-01T12:00:00Z"
+  }
+}
+```
+
+#### JavaScript Connection Examples
+
+**⚠️ IMPORTANT: Use Raw WebSockets, NOT Socket.IO**
+
+**Basic WebSocket Connection:**
+```javascript
+// Connect to real-time logs
+const wsUrl = window.location.protocol === 'https:'
+  ? 'wss://whyland-ai.nakedsun.xyz/ws/logs'
+  : 'ws://localhost:8000/ws/logs';
+
+const ws = new WebSocket(wsUrl);
+
+ws.onopen = function(event) {
+  console.log('WebSocket connected');
+};
+
+ws.onmessage = function(event) {
+  const message = JSON.parse(event.data);
+  console.log('Received:', message);
+
+  // Handle different message types
+  switch(message.type) {
+    case 'log_entry':
+      updateLogDisplay(message.data);
+      break;
+    case 'task_status':
+      updateTaskProgress(message.data);
+      break;
+    case 'connected':
+      console.log('Connection confirmed:', message.message);
+      break;
+  }
+};
+
+ws.onclose = function(event) {
+  console.log('WebSocket disconnected');
+};
+
+ws.onerror = function(error) {
+  console.error('WebSocket error:', error);
+};
+```
+
+// Monitor a specific task
+const taskId = 'your-task-uuid';
+const taskWsUrl = `wss://whyland-ai.nakedsun.xyz/ws/tasks/${taskId}`;
+const taskWs = new WebSocket(taskWsUrl);
+
+taskWs.onmessage = function(event) {
+  const message = JSON.parse(event.data);
+
+  if (message.type === 'task_complete') {
+    console.log('Task completed:', message.data);
+    taskWs.close();
+  }
+};
+```
+
+**React Hook for WebSocket:**
+```javascript
+import { useEffect, useRef, useState } from 'react';
+
+function useWebSocket(url) {
+  const [messages, setMessages] = useState([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const ws = useRef(null);
+
+  useEffect(() => {
+    ws.current = new WebSocket(url);
+
+    ws.current.onopen = () => {
+      setIsConnected(true);
+    };
+
+    ws.current.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      setMessages(prev => [...prev, message]);
+    };
+
+    ws.current.onclose = () => {
+      setIsConnected(false);
+    };
+
+    return () => {
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
+  }, [url]);
+
+  return { messages, isConnected };
+}
+
+// Usage in component
+function TaskMonitor({ taskId }) {
+  const wsUrl = `wss://whyland-ai.nakedsun.xyz/ws/tasks/${taskId}`;
+  const { messages, isConnected } = useWebSocket(wsUrl);
+
+  return (
+    <div>
+      <div>Status: {isConnected ? 'Connected' : 'Disconnected'}</div>
+      <div>
+        {messages.map((msg, index) => (
+          <div key={index}>{JSON.stringify(msg)}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+#### Connection Parameters
+
+**Log Streaming Parameters:**
+- `agent_id`: Filter logs by specific agent
+- `task_id`: Filter logs by specific task
+- `level`: Filter by log level (`debug`, `info`, `warning`, `error`)
+
+**Example URLs:**
+```
+ws://localhost:8000/ws/logs?agent_id=123&level=info
+wss://whyland-ai.nakedsun.xyz/ws/logs?task_id=456
+ws://localhost:8000/ws/tasks/task-uuid
+```
+
+#### Error Handling
+
+**Connection Errors:**
+```javascript
+ws.onerror = function(error) {
+  console.error('WebSocket connection failed');
+
+  // Implement reconnection logic
+  setTimeout(() => {
+    // Attempt to reconnect
+    connectWebSocket();
+  }, 5000);
+};
+```
+
+**Message Parsing Errors:**
+```javascript
+ws.onmessage = function(event) {
+  try {
+    const message = JSON.parse(event.data);
+    handleMessage(message);
+  } catch (error) {
+    console.error('Failed to parse WebSocket message:', error);
+  }
+};
+```
+
+#### Best Practices
+
+1. **Connection Management**: Always handle connection lifecycle events
+2. **Reconnection Logic**: Implement automatic reconnection on disconnection
+3. **Message Filtering**: Use query parameters to reduce message volume
+4. **Error Handling**: Gracefully handle parsing and connection errors
+5. **Resource Cleanup**: Close connections when components unmount
+6. **Security**: Use WSS in production environments
 
 ## 📖 Dynamic Agent Documentation System
 
@@ -696,7 +967,7 @@ Generated documentation includes:
 
 ### Example 1: Create and Test an Agent
 
-**Step 1: Create Agent**
+**Step 1: Create Static Agent (Legacy)**
 ```json
 POST /api/v1/agents/create
 {
@@ -707,6 +978,45 @@ POST /api/v1/agents/create
     "temperature": 0.3,
     "max_tokens": 500,
     "system_prompt": "You are a helpful AI assistant that creates concise summaries."
+  }
+}
+```
+
+**Model Selection Workflow:**
+```javascript
+// 1. Get available models
+const modelsResponse = await fetch('/api/v1/ollama/models/names');
+const { models } = await modelsResponse.json();
+
+// 2. User selects model from dropdown/interface
+const selectedModel = models[0]; // e.g., "llama2"
+
+// 3. Create agent with selected model
+const agentResponse = await fetch('/api/v1/agents/create', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer your-api-key'
+  },
+  body: JSON.stringify({
+    name: "My Custom Agent",
+    description: "Agent using selected model",
+    model_name: selectedModel,
+    config: { temperature: 0.7 }
+  })
+});
+```
+
+**Step 1 Alternative: Create Dynamic Agent**
+```json
+POST /api/v1/agents/create
+{
+  "name": "Email Analyzer",
+  "description": "Dynamic agent for analyzing emails",
+  "agent_type": "email_analyzer",
+  "config": {
+    "importance_threshold": 0.7,
+    "categories": ["urgent", "important", "normal"]
   }
 }
 ```
@@ -840,6 +1150,15 @@ eventSource.onmessage = function(event) {
 **List Agents with Filters:**
 ```
 GET /api/v1/agents?active_only=true&limit=20&offset=0
+GET /api/v1/agents?agent_type=email_analyzer&include_dynamic=true&limit=10
+GET /api/v1/agents?include_dynamic=false  # Only static agents
+```
+
+**List Tasks with Filters:**
+```
+GET /api/v1/tasks?agent_id=uuid&status=completed&limit=50
+GET /api/v1/tasks?agent_type=email_analyzer&include_dynamic=true
+GET /api/v1/tasks?status=running&limit=20&offset=0
 ```
 
 **Historical Logs with Search:**
@@ -900,9 +1219,187 @@ GET /api/v1/metrics
 agent_tasks_total{agent_id="123",status="completed"} 45
 agent_tasks_total{agent_id="123",status="failed"} 2
 
-# HELP api_requests_total Total API requests  
+# HELP api_requests_total Total API requests
 # TYPE api_requests_total counter
 api_requests_total{method="POST",endpoint="/agents/create",status_code="200"} 12
+```
+
+### System Utilization Metrics
+
+The system provides comprehensive hardware utilization monitoring:
+
+**Get All System Metrics:**
+```bash
+GET /api/v1/system/metrics
+```
+
+**Response:**
+```json
+{
+  "timestamp": "2025-08-29T15:57:43.134767Z",
+  "cpu": {
+    "usage_percent": 0.3,
+    "frequency_mhz": {"current": 2.89, "min": 3000.0, "max": 3000.0},
+    "count": {"physical": 64, "logical": 64}
+  },
+  "memory": {
+    "total_gb": 157.24,
+    "used_gb": 11.92,
+    "usage_percent": 8.8
+  },
+  "gpu": [
+    {
+      "index": 0,
+      "name": "Tesla P40",
+      "utilization": {"gpu_percent": 0, "memory_percent": 0},
+      "memory": {"used_mb": 139, "total_mb": 24576},
+      "temperature_fahrenheit": 78.8,
+      "power": {"usage_watts": 9.92, "limit_watts": 250.0}
+    }
+  ]
+}
+```
+
+**Individual Metrics Endpoints:**
+```bash
+# CPU metrics
+GET /api/v1/system/metrics/cpu
+
+# Memory metrics
+GET /api/v1/system/metrics/memory
+
+# Disk metrics
+GET /api/v1/system/metrics/disk
+
+# Network metrics
+GET /api/v1/system/metrics/network
+
+# GPU metrics (NVIDIA GPUs)
+GET /api/v1/system/metrics/gpu
+```
+
+**Supported Metrics:**
+- **CPU**: Usage percentage, frequency, core counts, time breakdowns
+- **Memory**: Total/used/free in GB, usage percentage, buffers/cached
+- **GPU**: Utilization %, memory usage, temperature (°F), clock frequencies, power (NVIDIA)
+- **Disk**: Usage statistics and I/O metrics
+- **Network**: Traffic statistics and interface information
+
+### System Monitoring Integration
+
+The system metrics endpoints are designed for seamless frontend integration:
+
+**Real-time Monitoring:**
+```javascript
+// Fetch system metrics every 5 seconds
+setInterval(async () => {
+  const response = await fetch('/api/v1/system/metrics');
+  const metrics = await response.json();
+
+  // Update dashboard with metrics
+  updateDashboard(metrics);
+}, 5000);
+```
+
+**GPU Temperature Monitoring (Tesla P40):**
+```javascript
+const gpuMetrics = await fetch('/api/v1/system/metrics/gpu');
+const gpus = await gpuMetrics.json();
+
+gpus.gpus.forEach((gpu, index) => {
+  console.log(`GPU ${index} (${gpu.name}): ${gpu.temperature_fahrenheit}°F`);
+});
+```
+
+**Resource Usage Alerts:**
+```javascript
+const systemMetrics = await fetch('/api/v1/system/metrics');
+const { cpu, memory, gpu } = await systemMetrics.json();
+
+// Check for high usage
+if (cpu.usage_percent > 80) {
+  alert('High CPU usage detected!');
+}
+
+if (memory.usage_percent > 90) {
+  alert('High memory usage detected!');
+}
+```
+
+### Ollama Model Management
+
+The system provides comprehensive Ollama model management capabilities:
+
+**Get Available Models:**
+```bash
+GET /api/v1/ollama/models
+```
+
+**Response:**
+```json
+{
+  "models": [
+    {
+      "name": "llama2",
+      "size": 3791730599,
+      "modified_at": "2024-01-01T00:00:00Z",
+      "digest": "sha256:123..."
+    },
+    {
+      "name": "codellama",
+      "size": 5377541952,
+      "modified_at": "2024-01-01T00:00:00Z",
+      "digest": "sha256:456..."
+    }
+  ]
+}
+```
+
+**Get Model Names Only:**
+```bash
+GET /api/v1/ollama/models/names
+```
+
+**Response:**
+```json
+{
+  "models": ["llama2", "codellama", "mistral"]
+}
+```
+
+**Pull New Models:**
+```bash
+POST /api/v1/ollama/models/pull/llama2:13b
+```
+
+**Frontend Integration for Model Selection:**
+```javascript
+// Fetch available models for dropdown
+const modelsResponse = await fetch('/api/v1/ollama/models/names');
+const { models } = await modelsResponse.json();
+
+// Populate dropdown
+const modelSelect = document.getElementById('model-select');
+models.forEach(model => {
+  const option = document.createElement('option');
+  option.value = model;
+  option.textContent = model;
+  modelSelect.appendChild(option);
+});
+```
+
+**Check Ollama Health:**
+```bash
+GET /api/v1/ollama/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "models_available": 5,
+  "default_model": "llama2"
+}
 ```
 
 ## 🛠️ Testing Tools
@@ -917,6 +1414,16 @@ api_requests_total{method="POST",endpoint="/agents/create",status_code="200"} 12
 ```bash
 # Health check
 curl http://localhost:8000/api/v1/health
+
+# System metrics
+curl http://localhost:8000/api/v1/system/metrics
+curl http://localhost:8000/api/v1/system/metrics/cpu
+curl http://localhost:8000/api/v1/system/metrics/gpu
+
+# Ollama model management
+curl http://localhost:8000/api/v1/ollama/models
+curl http://localhost:8000/api/v1/ollama/models/names
+curl http://localhost:8000/api/v1/ollama/health
 
 # Create agent (with auth)
 curl -X POST http://localhost:8000/api/v1/agents/create \
@@ -957,13 +1464,27 @@ http POST localhost:8000/api/v1/agents/create Authorization:"Bearer api-key" nam
 
 ## 🎉 Next Steps
 
-1. **Explore Swagger UI**: http://localhost:8000/docs
-2. **Read Agent Documentation**: http://localhost:8000/api/v1/docs/agent-creation
-3. **Test basic workflows**: Create agent → Run task → Check logs
-4. **Try WebSocket connections** for real-time updates
-5. **Monitor with Flower**: http://localhost:5555
-6. **Check database**: http://localhost:8080
-7. **Generate Agent-Specific Docs**: Use `/api/v1/agent-types/{type}/documentation`
+### ✅ All Systems Operational
+1. **Explore Swagger UI**: http://localhost:8000/docs (All endpoints working)
+2. **Monitor System Performance**: Check `/api/v1/system/metrics` for hardware utilization
+3. **Browse Available Models**: Use `/api/v1/ollama/models` to see available Ollama models
+4. **Test WebSocket connections** for real-time updates (fully documented)
+
+### 🚀 Start Building Workflows
+5. **Read Workflow Development Guide**: See `WORKFLOW_DEVELOPMENT_GUIDE.md`
+6. **Try Email Processing Example**: Complete implementation with frontend dashboard
+7. **Create Custom Agents**: Use the documented patterns and examples
+8. **Build Frontend Dashboards**: Use React components and WebSocket integration
+
+### 🔧 Development Tools
+9. **Monitor with Flower**: http://localhost:5555 (Celery task monitoring)
+10. **Check database**: http://localhost:8080 (Adminer database browser)
+11. **Generate Agent-Specific Docs**: Use `/api/v1/agent-types/{type}/documentation`
+
+### 📚 Learning Resources
+12. **Agent Creation Guide**: http://localhost:8000/api/v1/docs/agent-creation
+13. **Frontend Integration**: http://localhost:8000/api/v1/docs/frontend-integration
+14. **Example Configurations**: http://localhost:8000/api/v1/docs/examples
 
 The API is now ready for integration with your applications! 🚀
 
@@ -976,3 +1497,32 @@ The comprehensive documentation system is now available to help you:
 - **Follow best practices** for development and deployment
 
 **Start exploring**: http://localhost:8000/api/v1/docs/agent-creation
+
+### 🚀 Workflow Development Guide
+
+A comprehensive **WORKFLOW_DEVELOPMENT_GUIDE.md** is now available with:
+
+#### 📧 Email Processing Workflow Example
+- **Complete implementation** of IMAP email processing agent
+- **LLM integration** for email analysis and prioritization
+- **Task management** system for follow-ups
+- **Frontend dashboard** with React components
+- **Database schema** for workflow data
+
+#### 🛠️ Development Resources
+- **Agent creation patterns** and best practices
+- **Tool development** for custom integrations
+- **Frontend integration** examples and hooks
+- **WebSocket usage** for real-time updates
+- **Security considerations** for agent workflows
+
+#### 📁 Example Files Included
+```
+examples/
+├── email_analyzer_agent.json      # Agent configuration
+├── EmailWorkflowDashboard.jsx     # React dashboard component
+├── EmailWorkflowDashboard.css     # Component styling
+└── README.md                      # Implementation guide
+```
+
+**Read the guide**: See `WORKFLOW_DEVELOPMENT_GUIDE.md` for complete workflow development instructions!

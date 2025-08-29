@@ -28,7 +28,7 @@ export const loginUser = createAsyncThunk(
       const response = await apiClient.login(username, password);
       
       // Connect WebSocket after successful login
-      webSocketService.connect(apiClient.getAuthToken() || undefined);
+      webSocketService.connect('logs', apiClient.getAuthToken() || undefined);
       
       return {
         user: {
@@ -73,7 +73,7 @@ export const checkAuthStatus = createAsyncThunk(
       await apiClient.getHealth();
       
       // If successful, connect WebSocket
-      webSocketService.connect(token);
+      webSocketService.connect('logs', token);
       
       // For now, create a basic user object from stored data
       // In a real app, you'd fetch user data from an endpoint

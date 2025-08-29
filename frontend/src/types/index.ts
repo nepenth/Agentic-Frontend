@@ -148,3 +148,97 @@ export interface ToolValidationResponse {
   validation_time: number;
   errors?: string[];
 }
+
+// System metrics types
+export interface SystemMetrics {
+  timestamp: string;
+  cpu: CpuMetrics;
+  memory: MemoryMetrics;
+  gpu: GpuMetrics[];
+}
+
+export interface CpuMetrics {
+  usage_percent: number;
+  frequency_mhz: {
+    current: number;
+    min: number;
+    max: number;
+  };
+  count: {
+    physical: number;
+    logical: number;
+  };
+}
+
+export interface MemoryMetrics {
+  total_gb: number;
+  used_gb: number;
+  usage_percent: number;
+}
+
+export interface GpuMetrics {
+  index: number;
+  name: string;
+  utilization: {
+    gpu_percent: number;
+    memory_percent: number;
+  };
+  memory: {
+    used_mb: number;
+    total_mb: number;
+  };
+  temperature_fahrenheit: number;
+  power: {
+    usage_watts: number;
+    limit_watts: number;
+  };
+}
+
+export interface DiskMetrics {
+  total_gb: number;
+  used_gb: number;
+  usage_percent: number;
+  read_speed_mbps: number;
+  write_speed_mbps: number;
+}
+
+export interface NetworkMetrics {
+  interfaces: NetworkInterface[];
+  total_received_mb: number;
+  total_transmitted_mb: number;
+}
+
+export interface NetworkInterface {
+  name: string;
+  received_mb: number;
+  transmitted_mb: number;
+  speed_mbps: number;
+}
+
+// Ollama model management types
+export interface OllamaModel {
+  name: string;
+  size: number;
+  modified_at: string;
+  digest: string;
+}
+
+export interface OllamaModelsResponse {
+  models: OllamaModel[];
+}
+
+export interface OllamaModelNamesResponse {
+  models: string[];
+}
+
+export interface OllamaHealthResponse {
+  status: string;
+  models_available: number;
+  default_model: string;
+}
+
+export interface OllamaPullResponse {
+  status: string;
+  message: string;
+  model_name: string;
+}

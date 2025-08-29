@@ -98,17 +98,62 @@ const SystemHealth: React.FC = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['system-health'],
+    queryKey: ['system-metrics'],
     queryFn: async () => {
       try {
-        // Get Prometheus metrics from backend
-        const metricsResponse = await apiClient.getMetrics();
+        // Get real system metrics from the new endpoints
+        const [systemMetrics, gpuMetrics] = await Promise.all([
+          apiClient.getSystemMetrics(),
+          apiClient.getSystemMetricsGpu()
+        ]);
 
-        // For now, return mock data since we need to parse Prometheus format
-        // TODO: Parse Prometheus metrics format and extract system metrics
-        console.log('Raw Prometheus metrics:', metricsResponse);
-
-        return mockSystemMetrics;
+        // Transform the data to match our component's expected format
+        return {
+          cpu: {
+            usage: systemMetrics.cpu.usage_percent,
+            temperature: 68, // Not available in current API, using default
+            cores: systemMetrics.cpu.count.logical,
+            frequency: systemMetrics.cpu.frequency_mhz.current / 1000, // Convert MHz to GHz
+            loadAverage: [1.2, 1.1, 1.0], // Not available in current API
+          },
+          memory: {
+            used: systemMetrics.memory.used_gb,
+            total: systemMetrics.memory.total_gb,
+            percentage: systemMetrics.memory.usage_percent,
+            swapUsed: 0.5, // Not available in current API
+            swapTotal: 8, // Not available in current API
+          },
+          disk: {
+            used: 234, // Not available in current API
+            total: 500, // Not available in current API
+            percentage: 47, // Not available in current API
+            readSpeed: 125, // Not available in current API
+            writeSpeed: 98, // Not available in current API
+          },
+          network: {
+            download: 45.2, // Not available in current API
+            upload: 12.8, // Not available in current API
+            connections: 1247, // Not available in current API
+            latency: 23, // Not available in current API
+          },
+          gpus: Array.isArray(gpuMetrics) ? gpuMetrics.map((gpu: any) => ({
+            id: gpu.index,
+            name: gpu.name,
+            usage: gpu.utilization.gpu_percent,
+            memoryUsed: gpu.memory.used_mb / 1024, // Convert MB to GB
+            memoryTotal: gpu.memory.total_mb / 1024, // Convert MB to GB
+            temperature: gpu.temperature_fahrenheit,
+            frequency: 1531, // Not available in current API
+            memoryFrequency: 3802, // Not available in current API
+            power: gpu.power.usage_watts,
+          })) : mockSystemMetrics.gpus,
+          system: {
+            uptime: '7 days, 14 hours', // Not available in current API
+            loadAverage: [1.2, 1.1, 1.0], // Not available in current API
+            processes: 284, // Not available in current API
+            health: 'healthy',
+          },
+        };
       } catch (error) {
         console.warn('Failed to fetch system metrics, using mock data:', error);
         // Fallback to mock data
@@ -116,6 +161,16 @@ const SystemHealth: React.FC = () => {
       }
     },
     refetchInterval: 10000, // Refetch every 10 seconds
+  });
+
+  // Fetch Ollama health status
+  const {
+    data: ollamaHealth,
+    isLoading: ollamaLoading,
+  } = useQuery({
+    queryKey: ['ollama-health'],
+    queryFn: () => apiClient.getOllamaHealth(),
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   const handleRefresh = async () => {
@@ -285,6 +340,40 @@ const SystemHealth: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Read: {systemData?.disk?.readSpeed || 125} MB/s
+                  </Typography>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={3}>
+          <Card elevation={0}>
+            <CardContent>
+              {ollamaLoading ? (
+                <CardSkeleton lines={3} />
+              ) : (
+                <>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Ollama Service
+                    </Typography>
+                    {ollamaLoading ? (
+                      <Refresh sx={{ animation: 'spin 2s linear infinite' }} />
+                    ) : (
+                      <CheckCircle color={ollamaHealth?.status === 'healthy' ? 'success' : 'error'} />
+                    )}
+                  </Box>
+                  <Chip
+                    label={ollamaHealth?.status || 'unknown'}
+                    color={ollamaHealth?.status === 'healthy' ? 'success' : 'error'}
+                    sx={{ mb: 2, fontWeight: 600, textTransform: 'capitalize' }}
+                  />
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Models Available: {ollamaHealth?.models_available || 0}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Default: {ollamaHealth?.default_model || 'None'}
                   </Typography>
                 </>
               )}

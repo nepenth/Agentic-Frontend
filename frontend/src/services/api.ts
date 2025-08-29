@@ -229,6 +229,58 @@ class ApiClient {
     return response.data;
   }
 
+  // System metrics endpoints
+  async getSystemMetrics() {
+    const response = await this.client.get('/api/v1/system/metrics');
+    return response.data;
+  }
+
+  async getSystemMetricsCpu() {
+    const response = await this.client.get('/api/v1/system/metrics/cpu');
+    return response.data;
+  }
+
+  async getSystemMetricsMemory() {
+    const response = await this.client.get('/api/v1/system/metrics/memory');
+    return response.data;
+  }
+
+  async getSystemMetricsDisk() {
+    const response = await this.client.get('/api/v1/system/metrics/disk');
+    return response.data;
+  }
+
+  async getSystemMetricsNetwork() {
+    const response = await this.client.get('/api/v1/system/metrics/network');
+    return response.data;
+  }
+
+  async getSystemMetricsGpu() {
+    const response = await this.client.get('/api/v1/system/metrics/gpu');
+    return response.data;
+  }
+
+  // Ollama model management endpoints
+  async getOllamaModels() {
+    const response = await this.client.get('/api/v1/ollama/models');
+    return response.data;
+  }
+
+  async getOllamaModelNames() {
+    const response = await this.client.get('/api/v1/ollama/models/names');
+    return response.data;
+  }
+
+  async getOllamaHealth() {
+    const response = await this.client.get('/api/v1/ollama/health');
+    return response.data;
+  }
+
+  async pullOllamaModel(modelName: string) {
+    const response = await this.client.post(`/api/v1/ollama/models/pull/${modelName}`);
+    return response.data;
+  }
+
   // Dashboard data
   async getDashboardSummary() {
     const response = await this.client.get('/api/v1/dashboard/summary');

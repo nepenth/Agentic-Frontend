@@ -1,52 +1,99 @@
-import { io } from 'socket.io-client';
-import type { Socket } from 'socket.io-client';
 import type { LogEntry } from '../types';
 
+interface WebSocketMessage {
+  type: string;
+  data: any;
+}
+
 class WebSocketService {
-  private socket: Socket | null = null;
+  private socket: WebSocket | null = null;
   private url: string;
+  private currentEndpoint: string = 'logs';
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
+  private reconnectDelay: number = 1000;
+  private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
 
   constructor() {
-    this.url = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+    this.url = import.meta.env.VITE_WS_URL || 'wss://whyland-ai.nakedsun.xyz/ws';
   }
 
-  connect(token?: string) {
-    if (this.socket?.connected) {
+  connect(endpoint: string = 'logs', token?: string) {
+    if (this.socket?.readyState === WebSocket.OPEN) {
       return this.socket;
     }
 
-    this.socket = io(this.url, {
-      auth: token ? { token } : undefined,
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
-    });
+    // Store current endpoint for reconnection
+    this.currentEndpoint = endpoint;
 
-    this.socket.on('connect', () => {
+    // Build URL with specific endpoint and token if provided
+    const baseUrl = this.url.replace('/ws', ''); // Remove trailing /ws if present
+    const wsUrl = token ? `${baseUrl}/ws/${endpoint}?token=${token}` : `${baseUrl}/ws/${endpoint}`;
+
+    this.socket = new WebSocket(wsUrl);
+
+    this.socket.onopen = () => {
       console.log('WebSocket connected');
-    });
+      this.reconnectAttempts = 0;
+    };
 
-    this.socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
-    });
+    this.socket.onclose = (event) => {
+      console.log('WebSocket disconnected:', event.code, event.reason);
+      this.attemptReconnect(token);
+    };
 
-    this.socket.on('connect_error', (error) => {
+    this.socket.onerror = (error) => {
       console.error('WebSocket connection error:', error);
-    });
+    };
+
+    this.socket.onmessage = (event) => {
+      try {
+        const message: WebSocketMessage = JSON.parse(event.data);
+        this.handleMessage(message);
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
 
     return this.socket;
   }
 
-  disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
+  private attemptReconnect(token?: string) {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+
+      setTimeout(() => {
+        this.connect(this.currentEndpoint, token);
+      }, this.reconnectDelay * this.reconnectAttempts);
+    } else {
+      console.error('Max reconnection attempts reached');
     }
   }
 
+  private handleMessage(message: WebSocketMessage) {
+    const handlers = this.messageHandlers.get(message.type);
+    if (handlers) {
+      handlers.forEach(handler => {
+        try {
+          handler(message.data);
+        } catch (error) {
+          console.error(`Error in message handler for ${message.type}:`, error);
+        }
+      });
+    }
+  }
+
+  disconnect() {
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+    this.messageHandlers.clear();
+  }
+
   isConnected(): boolean {
-    return this.socket?.connected || false;
+    return this.socket?.readyState === WebSocket.OPEN;
   }
 
   // Subscribe to real-time logs
@@ -58,16 +105,22 @@ class WebSocketService {
       level?: string;
     }
   ) {
-    if (!this.socket) {
-      throw new Error('WebSocket not connected. Call connect() first.');
-    }
+    // Connect to logs endpoint with filters as query parameters
+    const queryParams = new URLSearchParams();
+    if (filters?.agent_id) queryParams.append('agent_id', filters.agent_id);
+    if (filters?.task_id) queryParams.append('task_id', filters.task_id);
+    if (filters?.level) queryParams.append('level', filters.level);
 
-    this.socket.emit('subscribe_logs', filters);
-    this.socket.on('log', callback);
+    const endpoint = `logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+    // Connect to the logs endpoint
+    this.connect(endpoint);
+
+    // Add handler for log_entry messages
+    this.addMessageHandler('log_entry', callback);
 
     return () => {
-      this.socket?.off('log', callback);
-      this.socket?.emit('unsubscribe_logs');
+      this.removeMessageHandler('log_entry', callback);
     };
   }
 
@@ -76,54 +129,72 @@ class WebSocketService {
     taskId: string,
     callback: (update: any) => void
   ) {
-    if (!this.socket) {
-      throw new Error('WebSocket not connected. Call connect() first.');
-    }
+    // Connect to task-specific endpoint
+    const endpoint = `tasks/${taskId}`;
+    this.connect(endpoint);
 
-    this.socket.emit('subscribe_task', { task_id: taskId });
-    this.socket.on(`task_${taskId}`, callback);
+    // Add handler for task messages
+    this.addMessageHandler('task_status', callback);
+    this.addMessageHandler('task_progress', callback);
+    this.addMessageHandler('task_complete', callback);
 
     return () => {
-      this.socket?.off(`task_${taskId}`, callback);
-      this.socket?.emit('unsubscribe_task', { task_id: taskId });
+      this.removeMessageHandler('task_status', callback);
+      this.removeMessageHandler('task_progress', callback);
+      this.removeMessageHandler('task_complete', callback);
     };
   }
 
   // Subscribe to general notifications
   subscribeToNotifications(callback: (notification: any) => void) {
-    if (!this.socket) {
-      throw new Error('WebSocket not connected. Call connect() first.');
-    }
-
-    this.socket.on('notification', callback);
+    this.addMessageHandler('notification', callback);
 
     return () => {
-      this.socket?.off('notification', callback);
+      this.removeMessageHandler('notification', callback);
     };
   }
 
-  // Emit custom events
-  emit(event: string, data: any) {
-    if (!this.socket) {
-      throw new Error('WebSocket not connected. Call connect() first.');
+  private addMessageHandler(type: string, callback: (data: any) => void) {
+    if (!this.messageHandlers.has(type)) {
+      this.messageHandlers.set(type, []);
     }
-    this.socket.emit(event, data);
+    this.messageHandlers.get(type)!.push(callback);
   }
 
-  // Listen to custom events
-  on(event: string, callback: (data: any) => void) {
-    if (!this.socket) {
-      throw new Error('WebSocket not connected. Call connect() first.');
+  private removeMessageHandler(type: string, callback: (data: any) => void) {
+    const handlers = this.messageHandlers.get(type);
+    if (handlers) {
+      const index = handlers.indexOf(callback);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+      if (handlers.length === 0) {
+        this.messageHandlers.delete(type);
+      }
     }
-    this.socket.on(event, callback);
   }
 
-  // Remove event listener
-  off(event: string, callback?: (data: any) => void) {
-    if (!this.socket) {
-      return;
+  // Send custom messages
+  send(type: string, data: any) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected. Call connect() first.');
     }
-    this.socket.off(event, callback);
+
+    const message = {
+      type,
+      data
+    };
+    this.socket.send(JSON.stringify(message));
+  }
+
+  // Listen to custom message types
+  on(type: string, callback: (data: any) => void) {
+    this.addMessageHandler(type, callback);
+  }
+
+  // Remove message listener
+  off(type: string, callback: (data: any) => void) {
+    this.removeMessageHandler(type, callback);
   }
 }
 
