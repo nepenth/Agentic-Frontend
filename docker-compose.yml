@@ -1,19 +1,24 @@
-version: '3.8'
-
 services:
   # Frontend
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: https://whyland-ai.nakedsun.xyz
+        VITE_WS_URL: wss://whyland-ai.nakedsun.xyz/ws
+        VITE_APP_NAME: Agentic Frontend
+        VITE_APP_VERSION: 0.1.0
     restart: unless-stopped
     ports:
       - "3000:80"
       - "3443:443"
     environment:
-      - VITE_API_BASE_URL=http://whyland-ai.nakedsun.xyz:8000
-      - VITE_WS_URL=ws://whyland-ai.nakedsun.xyz:8000/ws
+      - VITE_API_BASE_URL=https://whyland-ai.nakedsun.xyz
+      - VITE_WS_URL=wss://whyland-ai.nakedsun.xyz/ws
       - VITE_APP_NAME=Agentic Frontend
       - VITE_APP_VERSION=0.1.0
     volumes:
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/ssl/fullchain.pem:/etc/ssl/certs/fullchain.pem:ro
+      - ./frontend/ssl/privkey.pem:/etc/ssl/private/privkey.pem:ro

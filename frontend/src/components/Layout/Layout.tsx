@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Toolbar } from '@mui/material';
+import { Box } from '@mui/material';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 
@@ -10,20 +10,22 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, drawerWidth = 280 }) => {
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <TopBar drawerWidth={drawerWidth} />
       <Sidebar drawerWidth={drawerWidth} />
-      
+
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           width: { md: `calc(100% - ${drawerWidth}px)` },
-          minHeight: '100vh',
+          ml: { md: `${drawerWidth}px` },
+          mt: '64px', // Fixed height for AppBar
+          minHeight: 'calc(100vh - 64px)',
           backgroundColor: 'background.default',
+          overflow: 'auto',
         }}
       >
-        <Toolbar /> {/* This creates space for the fixed AppBar */}
         <Box sx={{ p: { xs: 2, md: 3 } }}>
           {children}
         </Box>
