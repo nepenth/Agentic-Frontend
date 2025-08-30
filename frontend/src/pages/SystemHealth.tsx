@@ -28,66 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '../services/api';
 import { CardSkeleton } from '../components';
 
-// Mock data for system health metrics
-const mockSystemMetrics = {
-  cpu: {
-    usage: 45,
-    temperature: 68,
-    cores: 8,
-    frequency: 3.2,
-    loadAverage: [1.2, 1.1, 1.0],
-  },
-  memory: {
-    used: 6.2,
-    total: 16,
-    percentage: 39,
-    swapUsed: 0.5,
-    swapTotal: 8,
-  },
-  disk: {
-    used: 234,
-    total: 500,
-    percentage: 47,
-    readSpeed: 125,
-    writeSpeed: 98,
-  },
-  network: {
-    download: 45.2,
-    upload: 12.8,
-    connections: 1247,
-    latency: 23,
-  },
-  gpus: [
-    {
-      id: 0,
-      name: 'Tesla P40',
-      usage: 67,
-      memoryUsed: 8.2,
-      memoryTotal: 24,
-      temperature: 149, // Fahrenheit
-      frequency: 1531,
-      memoryFrequency: 3802,
-      power: 125,
-    },
-    {
-      id: 1,
-      name: 'Tesla P40',
-      usage: 34,
-      memoryUsed: 4.1,
-      memoryTotal: 24,
-      temperature: 132, // Fahrenheit
-      frequency: 1412,
-      memoryFrequency: 3601,
-      power: 98,
-    },
-  ],
-  system: {
-    uptime: '7 days, 14 hours',
-    loadAverage: [1.2, 1.1, 1.0],
-    processes: 284,
-    health: 'healthy',
-  },
-};
+// No mock data - we will show "No data available" when API fails
 
 const SystemHealth: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
@@ -101,63 +42,78 @@ const SystemHealth: React.FC = () => {
     queryKey: ['system-metrics'],
     queryFn: async () => {
       try {
-        // Get real system metrics from the new endpoints
-        const [systemMetrics, gpuMetrics] = await Promise.all([
-          apiClient.getSystemMetrics(),
-          apiClient.getSystemMetricsGpu()
+        // Get real system metrics from individual endpoints
+        const [
+          cpuMetrics,
+          memoryMetrics,
+          diskMetrics,
+          networkMetrics,
+          gpuMetrics,
+          loadMetrics,
+          swapMetrics,
+          systemInfo
+        ] = await Promise.all([
+          apiClient.getSystemMetricsCpu().catch(() => null),
+          apiClient.getSystemMetricsMemory().catch(() => null),
+          apiClient.getSystemMetricsDisk().catch(() => null),
+          apiClient.getSystemMetricsNetwork().catch(() => null),
+          apiClient.getSystemMetricsGpu().catch(() => null),
+          apiClient.getSystemMetricsLoad().catch(() => null),
+          apiClient.getSystemMetricsSwap().catch(() => null),
+          apiClient.getSystemInfo().catch(() => null)
         ]);
 
         // Transform the data to match our component's expected format
         return {
-          cpu: {
-            usage: systemMetrics.cpu.usage_percent,
-            temperature: 68, // Not available in current API, using default
-            cores: systemMetrics.cpu.count.logical,
-            frequency: systemMetrics.cpu.frequency_mhz.current / 1000, // Convert MHz to GHz
-            loadAverage: [1.2, 1.1, 1.0], // Not available in current API
-          },
-          memory: {
-            used: systemMetrics.memory.used_gb,
-            total: systemMetrics.memory.total_gb,
-            percentage: systemMetrics.memory.usage_percent,
-            swapUsed: 0.5, // Not available in current API
-            swapTotal: 8, // Not available in current API
-          },
-          disk: {
-            used: 234, // Not available in current API
-            total: 500, // Not available in current API
-            percentage: 47, // Not available in current API
-            readSpeed: 125, // Not available in current API
-            writeSpeed: 98, // Not available in current API
-          },
-          network: {
-            download: 45.2, // Not available in current API
-            upload: 12.8, // Not available in current API
-            connections: 1247, // Not available in current API
-            latency: 23, // Not available in current API
-          },
+          cpu: cpuMetrics ? {
+            usage: cpuMetrics.usage_percent,
+            temperature: cpuMetrics.temperature_celsius || 'N/A',
+            cores: cpuMetrics.count?.logical || 'N/A',
+            frequency: cpuMetrics.frequency_mhz?.current ? cpuMetrics.frequency_mhz.current / 1000 : 'N/A', // Convert MHz to GHz
+            loadAverage: loadMetrics ? [loadMetrics['1m'], loadMetrics['5m'], loadMetrics['15m']] : 'N/A',
+          } : null,
+          memory: memoryMetrics ? {
+            used: memoryMetrics.used_gb,
+            total: memoryMetrics.total_gb,
+            percentage: memoryMetrics.usage_percent,
+            swapUsed: swapMetrics?.used_gb || 'N/A',
+            swapTotal: swapMetrics?.total_gb || 'N/A',
+          } : null,
+          disk: diskMetrics ? {
+            used: diskMetrics.usage?.used_gb || 'N/A',
+            total: diskMetrics.usage?.total_gb || 'N/A',
+            percentage: diskMetrics.usage?.usage_percent || 'N/A',
+            readSpeed: diskMetrics.io?.read_bytes_per_sec ? diskMetrics.io.read_bytes_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
+            writeSpeed: diskMetrics.io?.write_bytes_per_sec ? diskMetrics.io.write_bytes_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
+          } : null,
+          network: networkMetrics ? {
+            download: networkMetrics.speeds?.bytes_recv_per_sec ? networkMetrics.speeds.bytes_recv_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
+            upload: networkMetrics.speeds?.bytes_sent_per_sec ? networkMetrics.speeds.bytes_sent_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
+            connections: networkMetrics.io?.packets_recv || 'N/A',
+            latency: 'N/A', // Not available in current API
+          } : null,
           gpus: Array.isArray(gpuMetrics) ? gpuMetrics.map((gpu: any) => ({
             id: gpu.index,
             name: gpu.name,
-            usage: gpu.utilization.gpu_percent,
-            memoryUsed: gpu.memory.used_mb / 1024, // Convert MB to GB
-            memoryTotal: gpu.memory.total_mb / 1024, // Convert MB to GB
-            temperature: gpu.temperature_fahrenheit,
-            frequency: 1531, // Not available in current API
-            memoryFrequency: 3802, // Not available in current API
-            power: gpu.power.usage_watts,
-          })) : mockSystemMetrics.gpus,
-          system: {
-            uptime: '7 days, 14 hours', // Not available in current API
-            loadAverage: [1.2, 1.1, 1.0], // Not available in current API
-            processes: 284, // Not available in current API
+            usage: gpu.utilization?.gpu_percent || 0,
+            memoryUsed: gpu.memory?.used_mb ? gpu.memory.used_mb / 1024 : 0, // Convert MB to GB
+            memoryTotal: gpu.memory?.total_mb ? gpu.memory.total_mb / 1024 : 0, // Convert MB to GB
+            temperature: gpu.temperature_fahrenheit || 'N/A',
+            frequency: gpu.clocks?.graphics_mhz || 'N/A',
+            memoryFrequency: gpu.clocks?.memory_mhz || 'N/A',
+            power: gpu.power?.usage_watts || 'N/A',
+          })) : [],
+          system: systemInfo ? {
+            uptime: systemInfo.uptime?.formatted || 'N/A',
+            loadAverage: loadMetrics ? [loadMetrics['1m'], loadMetrics['5m'], loadMetrics['15m']] : 'N/A',
+            processes: systemInfo.processes?.total_count || 'N/A',
             health: 'healthy',
-          },
+          } : null,
         };
       } catch (error) {
-        console.warn('Failed to fetch system metrics, using mock data:', error);
-        // Fallback to mock data
-        return mockSystemMetrics;
+        console.warn('Failed to fetch system metrics:', error);
+        // Return null to indicate no data available
+        return null;
       }
     },
     refetchInterval: 10000, // Refetch every 10 seconds
@@ -192,18 +148,18 @@ const SystemHealth: React.FC = () => {
   };
 
 
-  if (error) {
+  if (error || systemData === null) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert
-          severity="error"
+          severity={error ? "error" : "warning"}
           action={
             <Button color="inherit" size="small" onClick={handleRefresh}>
               Retry
             </Button>
           }
         >
-          Failed to load system health data. Please try again.
+          {error ? "Failed to load system health data. Please try again." : "No system health data available. The backend may not be providing this information."}
         </Alert>
       </Box>
     );
@@ -441,14 +397,22 @@ const SystemHealth: React.FC = () => {
                       Load Average (1m, 5m, 15m)
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 2 }}>
-                      {(systemData?.cpu?.loadAverage || [1.2, 1.1, 1.0]).map((load: number, index: number) => (
+                      {systemData?.cpu?.loadAverage === 'N/A' ? (
                         <Chip
-                          key={index}
-                          label={load.toFixed(1)}
+                          label="N/A"
                           size="small"
                           variant="outlined"
                         />
-                      ))}
+                      ) : (
+                        (Array.isArray(systemData?.cpu?.loadAverage) ? systemData.cpu.loadAverage : [1.2, 1.1, 1.0]).map((load: number, index: number) => (
+                          <Chip
+                            key={index}
+                            label={load.toFixed(1)}
+                            size="small"
+                            variant="outlined"
+                          />
+                        ))
+                      )}
                     </Box>
                   </Box>
                 </Box>
@@ -488,7 +452,7 @@ const SystemHealth: React.FC = () => {
                       <Box sx={{ flex: 1 }}>
                         <LinearProgress
                           variant="determinate"
-                          value={Math.min((systemData?.network?.download || 45.2) * 2, 100)}
+                          value={typeof systemData?.network?.download === 'number' ? Math.min(systemData.network.download * 2, 100) : 0}
                           sx={{ height: 6, borderRadius: 1 }}
                           color="success"
                         />
@@ -497,7 +461,7 @@ const SystemHealth: React.FC = () => {
                       <Box sx={{ flex: 1 }}>
                         <LinearProgress
                           variant="determinate"
-                          value={Math.min((systemData?.network?.upload || 12.8) * 5, 100)}
+                          value={typeof systemData?.network?.upload === 'number' ? Math.min(systemData.network.upload * 5, 100) : 0}
                           sx={{ height: 6, borderRadius: 1 }}
                           color="info"
                         />
@@ -505,7 +469,7 @@ const SystemHealth: React.FC = () => {
                       </Box>
                     </Box>
                     <Typography variant="body2" color="text.secondary">
-                      Connections: {systemData?.network?.connections || 1247} • Latency: {systemData?.network?.latency || 23}ms
+                      Connections: {systemData?.network?.connections || 'N/A'} • Latency: {systemData?.network?.latency || 'N/A'}ms
                     </Typography>
                   </Box>
 
@@ -517,7 +481,7 @@ const SystemHealth: React.FC = () => {
                     </Box>
                     <LinearProgress
                       variant="determinate"
-                      value={systemData?.disk?.percentage || 47}
+                      value={typeof systemData?.disk?.percentage === 'number' ? systemData.disk.percentage : 0}
                       sx={{ height: 8, borderRadius: 1 }}
                       color="warning"
                     />
@@ -556,7 +520,7 @@ const SystemHealth: React.FC = () => {
                 </Box>
               ) : (
                 <Box>
-                  {(systemData?.gpus || mockSystemMetrics.gpus).map((gpu: any, _index: number) => (
+                  {(systemData?.gpus || []).map((gpu: any, _index: number) => (
                     <Box key={gpu.id} sx={{ mb: 3 }}>
                       <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'primary.main' }}>
                         GPU {gpu.id + 1}: {gpu.name}

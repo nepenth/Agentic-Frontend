@@ -43,9 +43,32 @@ class ApiClient {
   }
 
   private handleApiError(error: AxiosError): ApiError {
+    // Handle CORS/network errors
+    if (!error.response) {
+      if (error.code === 'ERR_NETWORK') {
+        return {
+          detail: 'Network error: Unable to connect to the server. Please check your internet connection and server status.',
+          status_code: 0,
+        };
+      }
+      return {
+        detail: `Connection error: ${error.message}`,
+        status_code: 0,
+      };
+    }
+
+    // Handle CORS preflight errors
+    if (error.response.status === 0) {
+      return {
+        detail: 'CORS error: The server is not configured to accept requests from this origin. Please check the server CORS configuration.',
+        status_code: 0,
+      };
+    }
+
     if (error.response?.data) {
       return error.response.data as ApiError;
     }
+
     return {
       detail: error.message || 'An unexpected error occurred',
       status_code: error.response?.status || 500,
@@ -257,6 +280,21 @@ class ApiClient {
 
   async getSystemMetricsGpu() {
     const response = await this.client.get('/api/v1/system/metrics/gpu');
+    return response.data;
+  }
+
+  async getSystemMetricsLoad() {
+    const response = await this.client.get('/api/v1/system/metrics/load');
+    return response.data;
+  }
+
+  async getSystemMetricsSwap() {
+    const response = await this.client.get('/api/v1/system/metrics/swap');
+    return response.data;
+  }
+
+  async getSystemInfo() {
+    const response = await this.client.get('/api/v1/system/info');
     return response.data;
   }
 
