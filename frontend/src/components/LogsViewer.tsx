@@ -11,7 +11,6 @@ import {
   Select,
   MenuItem,
   TextField,
-  IconButton,
   Alert,
   Paper,
   List,
@@ -19,7 +18,6 @@ import {
   ListItemText,
   Divider,
   Badge,
-  Tooltip,
   Switch,
   FormControlLabel,
   Grid,
@@ -29,13 +27,10 @@ import {
   Stop,
   Clear,
   FilterList,
-  ExpandMore,
-  ExpandLess,
   BugReport,
   Info,
   Warning,
   Error,
-  CheckCircle,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import webSocketService from '../services/websocket';
@@ -423,60 +418,62 @@ const LogsViewer: React.FC = () => {
                 </Typography>
               </Box>
             ) : (
-              <List dense>
-                {selectedChannelData.logs.map((log, index) => (
-                  <React.Fragment key={`${log.timestamp}-${index}`}>
-                    <ListItem sx={{ px: 0, py: 0.5 }}>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {getLogLevelIcon(log.level)}
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontFamily: 'monospace',
-                                fontSize: '0.8rem',
-                                color: LOG_COLORS[log.level as keyof typeof LOG_COLORS] || '#000',
-                                flex: 1,
-                              }}
-                            >
-                              [{new Date(log.timestamp).toLocaleTimeString()}] {log.message}
-                            </Typography>
-                          </Box>
-                        }
-                        secondary={
-                          <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                            {log.agent_id && (
+              selectedChannelData && (
+                <List dense>
+                  {selectedChannelData.logs.map((log, index) => (
+                    <React.Fragment key={`${log.timestamp}-${index}`}>
+                      <ListItem sx={{ px: 0, py: 0.5 }}>
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              {getLogLevelIcon(log.level)}
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.8rem',
+                                  color: LOG_COLORS[log.level as keyof typeof LOG_COLORS] || '#000',
+                                  flex: 1,
+                                }}
+                              >
+                                [{new Date(log.timestamp).toLocaleTimeString()}] {log.message}
+                              </Typography>
+                            </Box>
+                          }
+                          secondary={
+                            <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                              {log.agent_id && (
+                                <Chip
+                                  label={`Agent: ${log.agent_id}`}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              )}
+                              {log.task_id && (
+                                <Chip
+                                  label={`Task: ${log.task_id}`}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              )}
                               <Chip
-                                label={`Agent: ${log.agent_id}`}
+                                label={log.level.toUpperCase()}
                                 size="small"
-                                variant="outlined"
+                                color={log.level === 'error' ? 'error' : log.level === 'warning' ? 'warning' : 'default'}
                                 sx={{ fontSize: '0.7rem' }}
                               />
-                            )}
-                            {log.task_id && (
-                              <Chip
-                                label={`Task: ${log.task_id}`}
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontSize: '0.7rem' }}
-                              />
-                            )}
-                            <Chip
-                              label={log.level.toUpperCase()}
-                              size="small"
-                              color={log.level === 'error' ? 'error' : log.level === 'warning' ? 'warning' : 'default'}
-                              sx={{ fontSize: '0.7rem' }}
-                            />
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                    {index < selectedChannelData.logs.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-                <div ref={logsEndRef} />
-              </List>
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                      {index < selectedChannelData.logs.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))}
+                  <div ref={logsEndRef} />
+                </List>
+              )
             )}
           </Paper>
         </CardContent>
