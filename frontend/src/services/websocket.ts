@@ -80,7 +80,7 @@ class WebSocketService {
       this.disconnect();
     }, 90000);
 
-    console.log('Heartbeat received:', timestamp);
+    console.log('Heartbeat received:', timestamp, `(last pong: ${this.lastPongTime})`);
   }
 
   // Rate limiting methods
