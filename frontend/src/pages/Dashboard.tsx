@@ -100,37 +100,39 @@ const Dashboard: React.FC = () => {
     refetchInterval: 30000,
   });
 
-  // Mock security status for now (backend endpoint doesn't exist)
-  const securityStatus = {
-    active_agents: agents?.length || 0,
-    total_incidents: 0,
-    resource_limits: {
-      max_concurrent_agents: 8,
-      max_memory_mb: 131072, // 128GB
-    },
-  };
+  // Fetch security status
+  const {
+    data: securityStatus,
+    isLoading: securityLoading,
+  } = useQuery({
+    queryKey: ['security-status'],
+    queryFn: () => apiClient.getSecurityStatus(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
 
-  // Mock system metrics for now (backend endpoint doesn't exist)
-  const systemMetrics = {
-    cpu: { usage_percent: 45.2 },
-    memory: { used_gb: 6.2, total_gb: 16, usage_percent: 38.8 },
-    gpu: [{
-      utilization: { gpu_percent: 67, memory_percent: 42 },
-      memory: { used_mb: 17280, total_mb: 24576 }, // 17GB/24GB
-      temperature_fahrenheit: 149,
-    }],
-  };
+  // Fetch system metrics
+  const {
+    data: systemMetrics,
+    isLoading: systemMetricsLoading,
+  } = useQuery({
+    queryKey: ['system-metrics-dashboard'],
+    queryFn: () => apiClient.getSystemMetrics(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
 
-  // Mock Ollama health for now (backend endpoint doesn't exist)
-  const ollamaHealth = {
-    status: 'healthy',
-    models_available: 3,
-    default_model: 'llama2:7b',
-  };
+  // Fetch Ollama health
+  const {
+    data: ollamaHealth,
+    isLoading: ollamaLoading,
+  } = useQuery({
+    queryKey: ['ollama-health-dashboard'],
+    queryFn: () => apiClient.getOllamaHealth(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
 
-  // Mock system health for now (will be replaced with real metrics)
-  const systemHealth = 'healthy';
-  const isLoading = agentsLoading || tasksLoading;
+  // Calculate system health from security status
+  const systemHealth = securityStatus?.status || 'unknown';
+  const isLoading = agentsLoading || tasksLoading || securityLoading || systemMetricsLoading || ollamaLoading;
   const error = agentsError || tasksError;
 
   // Calculate dashboard data from real API responses
@@ -174,6 +176,7 @@ const Dashboard: React.FC = () => {
   const handleRefresh = async () => {
     setLastRefresh(new Date());
     // The queries will automatically refetch due to refetchInterval
+    // But we can also manually trigger refetch for immediate update
   };
 
   const getStatusIcon = (status: string) => {
@@ -371,7 +374,7 @@ const Dashboard: React.FC = () => {
                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                        <Typography variant="body2" color="text.secondary">CPU</Typography>
                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                         {systemMetrics?.cpu?.usage_percent?.toFixed(1) || '0.0'}%
+                         {systemMetrics?.cpu?.usage_percent?.toFixed(1) || 'N/A'}%
                        </Typography>
                      </Box>
                      <LinearProgress
@@ -386,7 +389,7 @@ const Dashboard: React.FC = () => {
                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                        <Typography variant="body2" color="text.secondary">Memory</Typography>
                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                         {systemMetrics?.memory?.used_gb?.toFixed(1) || '0.0'}GB/{systemMetrics?.memory?.total_gb?.toFixed(1) || '0.0'}GB
+                         {systemMetrics?.memory?.used_gb?.toFixed(1) || 'N/A'}GB/{systemMetrics?.memory?.total_gb?.toFixed(1) || 'N/A'}GB
                        </Typography>
                      </Box>
                      <LinearProgress
@@ -401,14 +404,14 @@ const Dashboard: React.FC = () => {
                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                        <Typography variant="body2" color="text.secondary">GPU</Typography>
                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                         {systemMetrics?.gpu?.[0]?.temperature_fahrenheit?.toFixed(0) || '78'}°F
+                         {systemMetrics?.gpu?.[0]?.temperature_fahrenheit?.toFixed(0) || 'N/A'}°F
                        </Typography>
                      </Box>
                      <LinearProgress
                        variant="determinate"
                        value={systemMetrics?.gpu?.[0]?.utilization?.gpu_percent || 0}
                        sx={{ height: 4, borderRadius: 2 }}
-                       color={systemMetrics?.gpu?.[0]?.temperature_fahrenheit > 150 ? "error" : "warning"}
+                       color={(systemMetrics?.gpu?.[0]?.temperature_fahrenheit && systemMetrics.gpu[0].temperature_fahrenheit > 150) ? "error" : "warning"}
                      />
                    </Box>
 
@@ -417,8 +420,8 @@ const Dashboard: React.FC = () => {
                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                        <Typography variant="body2" color="text.secondary">GPU Memory</Typography>
                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                         {systemMetrics?.gpu?.[0]?.memory?.used_mb ? (systemMetrics.gpu[0].memory.used_mb / 1024).toFixed(1) : '0.1'}GB/
-                         {systemMetrics?.gpu?.[0]?.memory?.total_mb ? (systemMetrics.gpu[0].memory.total_mb / 1024).toFixed(1) : '24.0'}GB
+                         {systemMetrics?.gpu?.[0]?.memory?.used_mb ? (systemMetrics.gpu[0].memory.used_mb / 1024).toFixed(1) : 'N/A'}GB/
+                         {systemMetrics?.gpu?.[0]?.memory?.total_mb ? (systemMetrics.gpu[0].memory.total_mb / 1024).toFixed(1) : 'N/A'}GB
                        </Typography>
                      </Box>
                      <LinearProgress
@@ -445,7 +448,7 @@ const Dashboard: React.FC = () => {
                      <Typography color="text.secondary" gutterBottom variant="h6">
                        Security Status
                      </Typography>
-                     <Shield sx={{ fontSize: 32, color: securityStatus?.active_agents && securityStatus.active_agents > 0 ? 'success.main' : 'warning.main' }} />
+                     <Shield sx={{ fontSize: 32, color: (securityStatus && securityStatus.active_agents && securityStatus.active_agents > 0) ? 'success.main' : 'warning.main' }} />
                    </Box>
 
                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -461,11 +464,11 @@ const Dashboard: React.FC = () => {
                    <Box sx={{ mb: 2 }}>
                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                        <Typography variant="body2" color="text.secondary">Active Incidents</Typography>
-                       <Typography variant="body2" sx={{ fontWeight: 600, color: securityStatus?.total_incidents && securityStatus.total_incidents > 0 ? 'warning.main' : 'success.main' }}>
+                       <Typography variant="body2" sx={{ fontWeight: 600, color: (securityStatus?.total_incidents && securityStatus.total_incidents > 0) ? 'warning.main' : 'success.main' }}>
                          {securityStatus?.total_incidents || 0}
                        </Typography>
                      </Box>
-                     {securityStatus?.total_incidents && securityStatus.total_incidents > 0 ? (
+                     {(securityStatus?.total_incidents && securityStatus.total_incidents > 0) ? (
                        <LinearProgress
                          variant="determinate"
                          value={Math.min(securityStatus.total_incidents * 10, 100)}
@@ -524,16 +527,16 @@ const Dashboard: React.FC = () => {
                    </Box>
 
                    <Chip
-                     label={ollamaHealth?.status || 'unknown'}
-                     color={ollamaHealth?.status === 'healthy' ? 'success' : 'error'}
+                     label={ollamaHealth?.status || 'Not Available'}
+                     color={ollamaHealth?.status === 'healthy' ? 'success' : ollamaHealth?.status === 'error' ? 'error' : 'default'}
                      sx={{ mb: 2, fontWeight: 600, textTransform: 'capitalize' }}
                    />
 
                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                     Models Available: {ollamaHealth?.models_available || 0}
+                     Models Available: {ollamaHealth?.models_available || 'N/A'}
                    </Typography>
                    <Typography variant="body2" color="text.secondary">
-                     Default: {ollamaHealth?.default_model || 'None'}
+                     Default: {ollamaHealth?.default_model || 'N/A'}
                    </Typography>
 
                    <Button

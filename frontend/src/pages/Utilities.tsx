@@ -20,6 +20,8 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   OpenInNew,
@@ -30,12 +32,15 @@ import {
   Storage,
   Assessment,
   Launch,
+  BugReport,
 } from '@mui/icons-material';
 import type { BackendEndpoint } from '../types';
+import LogsViewer from '../components/LogsViewer';
 
 const Utilities: React.FC = () => {
   const [selectedEndpoint, setSelectedEndpoint] = useState<BackendEndpoint | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   const backendEndpoints: BackendEndpoint[] = [
     {
@@ -124,10 +129,10 @@ const Utilities: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-            Backend Management Tools
+            Backend Management & Monitoring
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Access and monitor backend services and tools
+            Access backend services, monitor real-time logs, and manage system tools
           </Typography>
         </Box>
         <IconButton>
@@ -135,13 +140,32 @@ const Utilities: React.FC = () => {
         </IconButton>
       </Box>
 
-      {/* Info Alert */}
-      <Alert severity="info" sx={{ mb: 4 }}>
-        <Typography variant="body2">
-          These tools provide direct access to backend services. Some may require additional authentication.
-          All links open in a new tab for security.
-        </Typography>
-      </Alert>
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
+          <Tab
+            icon={<Launch />}
+            label="Backend Tools"
+            iconPosition="start"
+          />
+          <Tab
+            icon={<BugReport />}
+            label="Live Logs"
+            iconPosition="start"
+          />
+        </Tabs>
+      </Box>
+
+      {/* Tab Content */}
+      {activeTab === 0 && (
+        <>
+          {/* Info Alert */}
+          <Alert severity="info" sx={{ mb: 4 }}>
+            <Typography variant="body2">
+              These tools provide direct access to backend services. Some may require additional authentication.
+              All links open in a new tab for security.
+            </Typography>
+          </Alert>
 
       {/* Service Cards Grid */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -312,6 +336,12 @@ const Utilities: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+        </>
+      )}
+
+      {activeTab === 1 && (
+        <LogsViewer />
+      )}
     </Box>
   );
 };

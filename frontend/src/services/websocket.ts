@@ -1,8 +1,12 @@
 import type { LogEntry } from '../types';
+import apiClient from './api';
 
 interface WebSocketMessage {
   type: string;
-  data: any;
+  data?: any;
+  timestamp?: string; // For pong messages
+  message?: string; // For error messages
+  retry_after?: number; // For rate limiting errors
 }
 
 class WebSocketService {
@@ -14,8 +18,92 @@ class WebSocketService {
   private reconnectDelay: number = 1000;
   private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
 
+  // Heartbeat mechanism (30-second ping/pong)
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private lastPongTime: number = Date.now();
+  private connectionTimeout: NodeJS.Timeout | null = null;
+
+  // Rate limiting (100 messages/minute per connection)
+  private messageCount: number = 0;
+  private rateLimitResetTime: number = Date.now();
+  private readonly MAX_MESSAGES_PER_MINUTE = 100;
+  private readonly RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+
   constructor() {
     this.url = import.meta.env.VITE_WS_URL || 'wss://whyland-ai.nakedsun.xyz/ws';
+  }
+
+  // Heartbeat mechanism methods
+  private startHeartbeat() {
+    this.stopHeartbeat(); // Clear any existing heartbeat
+
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.sendPing();
+      }
+    }, 30000); // 30 seconds as specified by backend
+
+    // Set connection timeout (90 seconds as specified by backend)
+    this.connectionTimeout = setTimeout(() => {
+      console.warn('WebSocket connection timeout - no pong received for 90 seconds');
+      this.disconnect();
+    }, 90000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+  }
+
+  private sendPing() {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: 'ping' }));
+    }
+  }
+
+  private handlePong(timestamp: string) {
+    this.lastPongTime = Date.now();
+
+    // Reset connection timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+    }
+
+    this.connectionTimeout = setTimeout(() => {
+      console.warn('WebSocket connection timeout - no pong received for 90 seconds');
+      this.disconnect();
+    }, 90000);
+
+    console.log('Heartbeat received:', timestamp);
+  }
+
+  // Rate limiting methods
+  private checkRateLimit(): boolean {
+    const now = Date.now();
+
+    // Reset counter if window has passed
+    if (now - this.rateLimitResetTime >= this.RATE_LIMIT_WINDOW_MS) {
+      this.messageCount = 0;
+      this.rateLimitResetTime = now;
+    }
+
+    // Check if we're approaching the limit (leave buffer for ping messages)
+    if (this.messageCount >= this.MAX_MESSAGES_PER_MINUTE - 10) {
+      console.warn('Approaching WebSocket rate limit, slowing down...');
+      return false;
+    }
+
+    return true;
+  }
+
+  private incrementMessageCount() {
+    this.messageCount++;
   }
 
   connect(endpoint: string = 'logs', token?: string) {
@@ -35,6 +123,7 @@ class WebSocketService {
     this.socket.onopen = () => {
       console.log('WebSocket connected');
       this.reconnectAttempts = 0;
+      this.startHeartbeat();
     };
 
     this.socket.onclose = (event) => {
@@ -49,6 +138,20 @@ class WebSocketService {
     this.socket.onmessage = (event) => {
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
+
+        // Handle heartbeat pong messages
+        if (message.type === 'pong' && message.timestamp) {
+          this.handlePong(message.timestamp);
+          return;
+        }
+
+        // Handle rate limiting errors
+        if (message.type === 'error' && message.retry_after) {
+          console.error('WebSocket rate limited:', message.message);
+          console.log(`Retry after ${message.retry_after} seconds`);
+          return;
+        }
+
         this.handleMessage(message);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
@@ -85,11 +188,18 @@ class WebSocketService {
   }
 
   disconnect() {
+    // Stop heartbeat before disconnecting
+    this.stopHeartbeat();
+
     if (this.socket) {
       this.socket.close();
       this.socket = null;
     }
     this.messageHandlers.clear();
+
+    // Reset rate limiting counters
+    this.messageCount = 0;
+    this.rateLimitResetTime = Date.now();
   }
 
   isConnected(): boolean {
@@ -113,8 +223,9 @@ class WebSocketService {
 
     const endpoint = `logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
 
-    // Connect to the logs endpoint
-    this.connect(endpoint);
+    // Connect to the logs endpoint with authentication token
+    const token = apiClient.getAuthToken();
+    this.connect(endpoint, token || undefined);
 
     // Add handler for log_entry messages
     this.addMessageHandler('log_entry', callback);
@@ -131,7 +242,10 @@ class WebSocketService {
   ) {
     // Connect to task-specific endpoint
     const endpoint = `tasks/${taskId}`;
-    this.connect(endpoint);
+
+    // Connect with authentication token
+    const token = apiClient.getAuthToken();
+    this.connect(endpoint, token || undefined);
 
     // Add handler for task messages
     this.addMessageHandler('task_status', callback);
@@ -174,17 +288,28 @@ class WebSocketService {
     }
   }
 
-  // Send custom messages
-  send(type: string, data: any) {
+  // Send custom messages with rate limiting
+  send(type: string, data?: any) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not connected. Call connect() first.');
     }
 
+    // Check rate limiting (skip for ping messages)
+    if (type !== 'ping' && !this.checkRateLimit()) {
+      console.warn('Message not sent due to rate limiting');
+      return false;
+    }
+
     const message = {
       type,
-      data
+      ...(data && { data })
     };
+
     this.socket.send(JSON.stringify(message));
+    if (type !== 'ping') {
+      this.incrementMessageCount();
+    }
+    return true;
   }
 
   // Listen to custom message types
