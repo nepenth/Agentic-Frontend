@@ -22,6 +22,7 @@ import {
   Collapse,
   LinearProgress,
   Grid,
+  Divider,
 } from '@mui/material';
 import {
   Send,
@@ -35,11 +36,12 @@ import {
   ExpandLess,
   Monitor,
   Refresh,
+  Timeline,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import type { ChatSession, ChatMessage, ChatModelsResponse, GpuMetrics } from '../types';
+import type { ChatSession, ChatMessage, ChatModelsResponse, GpuMetrics, PerformanceMetrics } from '../types';
 
 interface ChatPageProps {}
 
@@ -56,6 +58,8 @@ const Chat: React.FC<ChatPageProps> = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [gpuMonitorOpen, setGpuMonitorOpen] = useState(false);
+  const [performanceMetricsOpen, setPerformanceMetricsOpen] = useState(false);
+  const [selectedPerformanceMetrics, setSelectedPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
 
   // Fetch chat sessions
   const {
@@ -125,6 +129,9 @@ const Chat: React.FC<ChatPageProps> = () => {
         role: 'assistant',
         content: response.response || 'I received your message.',
         timestamp: currentTime,
+        metadata: response.performance_metrics ? {
+          performance_metrics: response.performance_metrics
+        } : undefined,
       };
 
       setMessages(prev => [...prev, userMessage, assistantMessage]);
@@ -292,6 +299,11 @@ const Chat: React.FC<ChatPageProps> = () => {
       }
       return newSet;
     });
+  };
+
+  const openPerformanceMetrics = (metrics: PerformanceMetrics) => {
+    setSelectedPerformanceMetrics(metrics);
+    setPerformanceMetricsOpen(true);
   };
 
   const MetricBar = ({ label, value, maxValue, unit = '%', color = 'primary' }: {
@@ -571,6 +583,7 @@ const Chat: React.FC<ChatPageProps> = () => {
                             color: message.role === 'user' ? 'white' : 'text.primary',
                             borderRadius: 2,
                             width: '100%',
+                            position: 'relative',
                           }}
                         >
                           {hasThinking ? (
@@ -639,6 +652,29 @@ const Chat: React.FC<ChatPageProps> = () => {
                               {message.content}
                             </Typography>
                           )}
+
+                          {/* Performance Metrics Toolbox */}
+                          {message.role === 'assistant' && message.metadata?.performance_metrics && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
+                              <Tooltip title="View Performance Metrics">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => openPerformanceMetrics(message.metadata!.performance_metrics)}
+                                  sx={{
+                                    color: 'text.secondary',
+                                    '&:hover': { color: 'primary.main' },
+                                    p: 0.5,
+                                  }}
+                                >
+                                  <Timeline fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Typography variant="caption" color="text.secondary">
+                                {message.metadata.performance_metrics.tokens_per_second.toFixed(1)} tokens/sec
+                              </Typography>
+                            </Box>
+                          )}
+
                           <Typography
                             variant="caption"
                             sx={{
@@ -909,6 +945,192 @@ const Chat: React.FC<ChatPageProps> = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGpuMonitorOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Performance Metrics Dialog */}
+      <Dialog
+        open={performanceMetricsOpen}
+        onClose={() => setPerformanceMetricsOpen(false)}
+        maxWidth="md"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            height: '80vh',
+            maxHeight: '700px',
+          },
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Timeline />
+          <Typography variant="h6">LLM Performance Metrics</Typography>
+        </DialogTitle>
+        <DialogContent>
+          {selectedPerformanceMetrics && (
+            <Box>
+              {/* Overview Cards */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'white' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                      {selectedPerformanceMetrics.tokens_per_second.toFixed(1)}
+                    </Typography>
+                    <Typography variant="body2">Tokens/Second</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'white' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                      {selectedPerformanceMetrics.total_tokens}
+                    </Typography>
+                    <Typography variant="body2">Total Tokens</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'white' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                      {selectedPerformanceMetrics.response_time_seconds.toFixed(2)}s
+                    </Typography>
+                    <Typography variant="body2">Response Time</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'white' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                      {selectedPerformanceMetrics.model_name}
+                    </Typography>
+                    <Typography variant="body2">Model</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Detailed Metrics */}
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                Detailed Performance Breakdown
+              </Typography>
+
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                      Response Times
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <MetricBar
+                        label="Total Response Time"
+                        value={selectedPerformanceMetrics.response_time_seconds}
+                        maxValue={10}
+                        unit="s"
+                        color="primary"
+                      />
+                      <MetricBar
+                        label="Model Load Time"
+                        value={selectedPerformanceMetrics.load_time_seconds}
+                        maxValue={selectedPerformanceMetrics.response_time_seconds}
+                        unit="s"
+                        color="warning"
+                      />
+                      <MetricBar
+                        label="Prompt Evaluation"
+                        value={selectedPerformanceMetrics.prompt_eval_time_seconds}
+                        maxValue={selectedPerformanceMetrics.response_time_seconds}
+                        unit="s"
+                        color="info"
+                      />
+                      <MetricBar
+                        label="Generation Time"
+                        value={selectedPerformanceMetrics.generation_time_seconds}
+                        maxValue={selectedPerformanceMetrics.response_time_seconds}
+                        unit="s"
+                        color="success"
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                      Token Usage
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ mb: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Prompt Tokens</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {selectedPerformanceMetrics.prompt_tokens}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Response Tokens</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {selectedPerformanceMetrics.response_tokens}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2">Total Tokens</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {selectedPerformanceMetrics.total_tokens}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Divider sx={{ my: 1 }} />
+
+                      <Box>
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          Context Length: {selectedPerformanceMetrics.context_length_chars} characters
+                        </Typography>
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          Generation Speed: {selectedPerformanceMetrics.tokens_per_second.toFixed(2)} tokens/second
+                        </Typography>
+                        <Typography variant="body2">
+                          Timestamp: {new Date(selectedPerformanceMetrics.timestamp).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Performance Insights */}
+              <Paper sx={{ p: 2, mt: 3, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                  Performance Insights
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {selectedPerformanceMetrics.tokens_per_second > 50 && (
+                    <Typography variant="body2" sx={{ color: 'success.main' }}>
+                      ✅ Excellent generation speed! Model is performing optimally.
+                    </Typography>
+                  )}
+                  {selectedPerformanceMetrics.tokens_per_second < 20 && (
+                    <Typography variant="body2" sx={{ color: 'warning.main' }}>
+                      ⚠️ Slower generation speed. Consider using a lighter model or optimizing prompts.
+                    </Typography>
+                  )}
+                  {selectedPerformanceMetrics.load_time_seconds > 1 && (
+                    <Typography variant="body2" sx={{ color: 'info.main' }}>
+                      ℹ️ Model load time indicates first-time usage. Subsequent responses will be faster.
+                    </Typography>
+                  )}
+                  {selectedPerformanceMetrics.response_time_seconds < 2 && (
+                    <Typography variant="body2" sx={{ color: 'success.main' }}>
+                      ✅ Fast response time! Excellent user experience.
+                    </Typography>
+                  )}
+                  {selectedPerformanceMetrics.total_tokens > 1000 && (
+                    <Typography variant="body2" sx={{ color: 'warning.main' }}>
+                      ⚠️ High token usage. Consider breaking down complex queries.
+                    </Typography>
+                  )}
+                </Box>
+              </Paper>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPerformanceMetricsOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

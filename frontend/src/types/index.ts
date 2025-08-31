@@ -291,11 +291,26 @@ export interface SendChatMessageRequest {
   metadata?: Record<string, any>;
 }
 
+export interface PerformanceMetrics {
+  response_time_seconds: number;
+  load_time_seconds: number;
+  prompt_eval_time_seconds: number;
+  generation_time_seconds: number;
+  prompt_tokens: number;
+  response_tokens: number;
+  total_tokens: number;
+  tokens_per_second: number;
+  context_length_chars: number;
+  model_name: string;
+  timestamp: string;
+}
+
 export interface ChatMessageResponse {
   message: ChatMessage;
   session_id: string;
   response?: string;
   tokens_used?: number;
+  performance_metrics?: PerformanceMetrics;
 }
 
 export interface ChatModelsResponse {
