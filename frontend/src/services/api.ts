@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import type { AxiosInstance } from 'axios';
-import type { Agent, Task, ApiError, LogEntry } from '../types';
+import type { Agent, Task, ApiError, LogEntry, ChatSession, ChatMessage, ChatSessionStats, CreateChatSessionRequest, SendChatMessageRequest, ChatMessageResponse, ChatModelsResponse, ChatTemplatesResponse } from '../types';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -9,7 +9,7 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
-      timeout: 30000,
+      timeout: 300000, // 5 minutes for local LLM inference (homelab environments)
       headers: {
         'Content-Type': 'application/json',
       },
@@ -233,10 +233,6 @@ class ApiClient {
     return response.data;
   }
 
-  async getSecurityLimits() {
-    const response = await this.client.get('/api/v1/security/limits');
-    return response.data;
-  }
 
   async validateToolExecution(validationData: {
     agent_id: string;
@@ -322,6 +318,56 @@ class ApiClient {
   // Dashboard data
   async getDashboardSummary() {
     const response = await this.client.get('/api/v1/dashboard/summary');
+    return response.data;
+  }
+
+  // Chat system endpoints
+  async createChatSession(sessionData: CreateChatSessionRequest): Promise<ChatSession> {
+    const response = await this.client.post('/api/v1/chat/sessions', sessionData);
+    return response.data;
+  }
+
+  async getChatSessions(): Promise<ChatSession[]> {
+    const response = await this.client.get('/api/v1/chat/sessions');
+    return response.data;
+  }
+
+  async getChatSession(sessionId: string): Promise<ChatSession> {
+    const response = await this.client.get(`/api/v1/chat/sessions/${sessionId}`);
+    return response.data;
+  }
+
+  async getChatSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+    const response = await this.client.get(`/api/v1/chat/sessions/${sessionId}/messages`);
+    return response.data;
+  }
+
+  async sendChatMessage(sessionId: string, messageData: SendChatMessageRequest): Promise<ChatMessageResponse> {
+    const response = await this.client.post(`/api/v1/chat/sessions/${sessionId}/messages`, messageData);
+    return response.data;
+  }
+
+  async updateChatSessionStatus(sessionId: string, status: string): Promise<ChatSession> {
+    const response = await this.client.put(`/api/v1/chat/sessions/${sessionId}/status`, { status });
+    return response.data;
+  }
+
+  async getChatSessionStats(sessionId: string): Promise<ChatSessionStats> {
+    const response = await this.client.get(`/api/v1/chat/sessions/${sessionId}/stats`);
+    return response.data;
+  }
+
+  async deleteChatSession(sessionId: string): Promise<void> {
+    await this.client.delete(`/api/v1/chat/sessions/${sessionId}`);
+  }
+
+  async getChatTemplates(): Promise<ChatTemplatesResponse> {
+    const response = await this.client.get('/api/v1/chat/templates');
+    return response.data;
+  }
+
+  async getChatModels(): Promise<ChatModelsResponse> {
+    const response = await this.client.get('/api/v1/chat/models');
     return response.data;
   }
 }

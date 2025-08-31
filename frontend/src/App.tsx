@@ -19,6 +19,7 @@ import Dashboard from './pages/Dashboard';
 import SystemHealth from './pages/SystemHealth';
 import Security from './pages/Security';
 import AgentManagement from './pages/AgentManagement';
+import Chat from './pages/Chat';
 import Utilities from './pages/Utilities';
 import Settings from './pages/Settings';
 import WorkflowTemplate from './pages/WorkflowTemplate';
@@ -87,6 +88,16 @@ const ThemedAppRoutes: React.FC = () => {
                   <PrivateRoute>
                     <Layout>
                       <AgentManagement />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/chat"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Chat />
                     </Layout>
                   </PrivateRoute>
                 }

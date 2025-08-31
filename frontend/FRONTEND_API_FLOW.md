@@ -21,6 +21,56 @@ The frontend uses a centralized `ApiClient` class (`frontend/src/services/api.ts
 - **Interceptors**: Request/response interceptors for auth and error handling
 - **Timeout**: 30-second timeout for all requests
 
+## Recent Frontend Improvements
+
+### Scroll Bar Fixes (✅ IMPLEMENTED)
+**Issue:** Pages were not displaying scroll bars when content overflowed
+**Root Cause:** Conflicting CSS with `display: flex` and `place-items: center` on body element
+**Solution:**
+- Removed `display: flex` and `place-items: center` from body element
+- Added `overflow: auto` to both html and body elements
+- Simplified #root container styling to allow proper height management
+- **Files Modified:** `frontend/src/index.css`, `frontend/src/App.css`
+
+### GPU Display Debugging (✅ IMPLEMENTED)
+**Issue:** Only one GPU was displaying despite API returning data for multiple GPUs
+**Root Cause:** Syntax error in GPU rendering code
+**Solution:**
+- Fixed syntax error with extra `);` in map function
+- Added comprehensive console logging for GPU processing and rendering
+- Improved React keys for proper component re-rendering: `key={`gpu-${gpu.id}-${_index}`}`
+- **Files Modified:** `frontend/src/pages/SystemHealth.tsx`
+
+### GPU Data Flow
+**Backend Response Format:**
+```json
+[
+  {
+    "index": 0,
+    "name": "Tesla P40",
+    "utilization": {"gpu_percent": 0, "memory_percent": 0},
+    "memory": {"total_mb": 24576, "used_mb": 139, "free_mb": 24436},
+    "temperature_fahrenheit": 75.2,
+    "clocks": {"graphics_mhz": 544, "memory_mhz": 405},
+    "power": {"usage_watts": 9.82, "limit_watts": 250.0}
+  },
+  {
+    "index": 1,
+    "name": "Tesla P40",
+    "utilization": {"gpu_percent": 0, "memory_percent": 0},
+    "memory": {"total_mb": 24576, "used_mb": 139, "free_mb": 24436},
+    "temperature_fahrenheit": 69.8,
+    "clocks": {"graphics_mhz": 544, "memory_mhz": 405},
+    "power": {"usage_watts": 9.82, "limit_watts": 250.0}
+  }
+]
+```
+
+**Frontend Processing:**
+- Maps GPU array to display format with proper unit conversions (MB to GB)
+- Handles missing data gracefully with fallbacks
+- Provides debugging information for troubleshooting
+
 ### Authentication Implementation
 
 ```typescript
@@ -100,6 +150,30 @@ const [cpuMetrics, memoryMetrics, ...] = await Promise.all([
 ]);
 ```
 
+**GPU Data Processing:**
+```typescript
+// Backend returns array of GPUs
+// Example response: [{"index":0,"name":"Tesla P40",...},{"index":1,"name":"Tesla P40",...}]
+
+// Frontend transforms to display format
+gpus: Array.isArray(gpuMetrics) ? gpuMetrics.map((gpu: any) => ({
+  id: gpu.index,
+  name: gpu.name,
+  usage: gpu.utilization?.gpu_percent || 0,
+  memoryUsed: gpu.memory?.used_mb ? gpu.memory.used_mb / 1024 : 0,
+  memoryTotal: gpu.memory?.total_mb ? gpu.memory.total_mb / 1024 : 0,
+  temperature: gpu.temperature_fahrenheit || 'N/A',
+  frequency: gpu.clocks?.graphics_mhz || 'N/A',
+  memoryFrequency: gpu.clocks?.memory_mhz || 'N/A',
+  power: gpu.power?.usage_watts || 'N/A',
+})) : []
+```
+
+**Debugging Features:**
+- Console logging for GPU processing: `console.log('Processing GPU data:', gpu)`
+- Console logging for GPU rendering: `console.log('Rendering GPU:', gpu.id, gpu.name, 'Index in array:', _index)`
+- Unique keys for React rendering: `key={`gpu-${gpu.id}-${_index}`}`
+
 **Real-time Updates:** None currently implemented
 
 ### Agent Management (`frontend/src/pages/AgentManagement.tsx`)
@@ -138,11 +212,12 @@ const deleteAgentMutation = useMutation({
 ### Security Center (`frontend/src/pages/Security.tsx`)
 
 **Primary APIs:**
-- `getSecurityStatus()` - Current security metrics and active agents
+- `getSecurityStatus()` - Current security metrics, active agents, and resource limits
 - `getSecurityHealth()` - Security service health status
 - `getSecurityIncidents()` - List security incidents with filtering
-- `getSecurityLimits()` - Resource limits and rate limiting configuration
 - `resolveSecurityIncident()` - Resolve security incidents with notes
+
+**Note:** Resource limits are included in the SecurityStatus response (`resource_limits` field) rather than a separate endpoint.
 
 **Usage Pattern:**
 ```typescript
@@ -445,11 +520,10 @@ if (error) {
 ### Security
 | Method | Endpoint | Purpose | Used By |
 |--------|----------|---------|---------|
-| `GET` | `/api/v1/security/status` | Security status | Dashboard, Security |
+| `GET` | `/api/v1/security/status` | Security status and resource limits | Dashboard, Security |
 | `GET` | `/api/v1/security/health` | Security health | Security |
 | `GET` | `/api/v1/security/incidents` | Security incidents | Security |
 | `POST` | `/api/v1/security/incidents/{id}/resolve` | Resolve incident | Security |
-| `GET` | `/api/v1/security/limits` | Security limits | Security |
 
 ### Ollama Integration
 | Method | Endpoint | Purpose | Used By |
@@ -556,5 +630,16 @@ Based on backend documentation, the following log sources are supported:
 2. Handle reconnection logic
 3. Clean up subscriptions on component unmount
 4. Parse messages safely with error handling
+
+### Debugging Features Added:
+1. **GPU Processing Logs**: Console logs for each GPU being processed from API response
+2. **GPU Rendering Logs**: Console logs for each GPU being rendered in React components
+3. **Unique React Keys**: Improved keys for proper component re-rendering: `gpu-${gpu.id}-${_index}`
+4. **Error Boundary Ready**: Components prepared for error boundary implementation
+
+### Recent Fixes Applied:
+1. **Scroll Bar Visibility**: Fixed CSS conflicts preventing scroll bars from appearing
+2. **GPU Display**: Fixed syntax error and added debugging for multi-GPU display
+3. **Documentation Updates**: Updated both backend and frontend documentation to reflect changes
 
 This document should be updated whenever new API calls or WebSocket connections are added to maintain it as the source of truth for frontend-backend integration.

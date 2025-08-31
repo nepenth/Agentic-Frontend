@@ -102,10 +102,6 @@ export interface SecurityLimits {
     current: number;
     max: number;
   };
-  execution_time: {
-    current: number;
-    max: number;
-  };
   memory_usage: {
     current_mb: number;
     max_mb: number;
@@ -241,4 +237,72 @@ export interface OllamaPullResponse {
   status: string;
   message: string;
   model_name: string;
+}
+
+// Chat system types
+export interface ChatSession {
+  id: string;
+  session_type: 'general' | 'agent_creation';
+  model_name: string;
+  user_id: string;
+  title: string;
+  status: 'active' | 'completed' | 'archived';
+  created_at: string;
+  updated_at: string;
+  config?: Record<string, any>;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ChatSessionStats {
+  session_id: string;
+  message_count: number;
+  total_tokens: number;
+  duration_seconds: number;
+  last_activity: string;
+}
+
+export interface ChatTemplate {
+  id: string;
+  name: string;
+  description: string;
+  session_type: string;
+  config: Record<string, any>;
+}
+
+export interface CreateChatSessionRequest {
+  session_type: 'general' | 'agent_creation';
+  model_name: string;
+  user_id?: string;
+  title: string;
+  config?: Record<string, any>;
+}
+
+export interface SendChatMessageRequest {
+  message: string;
+  model_name?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ChatMessageResponse {
+  message: ChatMessage;
+  session_id: string;
+  response?: string;
+  tokens_used?: number;
+}
+
+export interface ChatModelsResponse {
+  models: string[];
+  default_model: string;
+}
+
+export interface ChatTemplatesResponse {
+  templates: ChatTemplate[];
 }
