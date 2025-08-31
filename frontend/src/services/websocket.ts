@@ -17,6 +17,7 @@ class WebSocketService {
   private maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 1000;
   private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
+  private connectionStatusCallbacks: ((status: 'connecting' | 'connected' | 'disconnected' | 'error', error?: string) => void)[] = [];
 
   // Heartbeat mechanism (30-second ping/pong)
   private heartbeatInterval: NodeJS.Timeout | null = null;
@@ -108,6 +109,7 @@ class WebSocketService {
 
   connect(endpoint: string = 'logs', token?: string) {
     if (this.socket?.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected, returning existing connection');
       return this.socket;
     }
 
@@ -118,21 +120,28 @@ class WebSocketService {
     const baseUrl = this.url.replace('/ws', ''); // Remove trailing /ws if present
     const wsUrl = token ? `${baseUrl}/ws/${endpoint}?token=${token}` : `${baseUrl}/ws/${endpoint}`;
 
+    console.log('Attempting WebSocket connection:', wsUrl);
+    console.log('Token provided:', !!token);
+
+    this.notifyConnectionStatus('connecting');
     this.socket = new WebSocket(wsUrl);
 
     this.socket.onopen = () => {
       console.log('WebSocket connected');
       this.reconnectAttempts = 0;
       this.startHeartbeat();
+      this.notifyConnectionStatus('connected');
     };
 
     this.socket.onclose = (event) => {
       console.log('WebSocket disconnected:', event.code, event.reason);
+      this.notifyConnectionStatus('disconnected');
       this.attemptReconnect(token);
     };
 
     this.socket.onerror = (error) => {
       console.error('WebSocket connection error:', error);
+      this.notifyConnectionStatus('error', 'WebSocket connection failed');
     };
 
     this.socket.onmessage = (event) => {
@@ -204,6 +213,29 @@ class WebSocketService {
 
   isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  // Connection status management
+  private notifyConnectionStatus(status: 'connecting' | 'connected' | 'disconnected' | 'error', error?: string) {
+    this.connectionStatusCallbacks.forEach(callback => {
+      try {
+        callback(status, error);
+      } catch (err) {
+        console.error('Error in connection status callback:', err);
+      }
+    });
+  }
+
+  onConnectionStatus(callback: (status: 'connecting' | 'connected' | 'disconnected' | 'error', error?: string) => void) {
+    this.connectionStatusCallbacks.push(callback);
+
+    // Return unsubscribe function
+    return () => {
+      const index = this.connectionStatusCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.connectionStatusCallbacks.splice(index, 1);
+      }
+    };
   }
 
   // Subscribe to real-time logs

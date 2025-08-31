@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -29,6 +29,8 @@ import {
   Tooltip,
   Switch,
   FormControlLabel,
+  Avatar,
+  Divider,
 } from '@mui/material';
 import {
   Add,
@@ -40,11 +42,14 @@ import {
   CheckCircle,
   Error,
   Settings,
+  AutoAwesome,
+  Send,
+  Person,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/api';
-import type { Agent, OllamaModelNamesResponse } from '../types';
+import type { Agent, OllamaModelNamesResponse, ChatSession, ChatMessage } from '../types';
 
 interface CreateAgentForm {
   name: string;
@@ -59,7 +64,14 @@ const AgentManagement: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [wizardDialogOpen, setWizardDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [wizardSession, setWizardSession] = useState<ChatSession | null>(null);
+  const [wizardMessages, setWizardMessages] = useState<ChatMessage[]>([]);
+  const [wizardInput, setWizardInput] = useState('');
+  const [isWizardTyping, setIsWizardTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState<CreateAgentForm>({
     name: '',
     description: '',
@@ -120,6 +132,43 @@ const AgentManagement: React.FC = () => {
     },
   });
 
+  // Wizard mutations
+  const createWizardSessionMutation = useMutation({
+    mutationFn: (description: string) =>
+      apiClient.createChatSession({
+        session_type: 'agent_creation',
+        model_name: formData.model_name,
+        title: `Agent Creation: ${description.slice(0, 50)}...`,
+        user_id: 'current-user',
+        config: { description },
+      }),
+    onSuccess: (session) => {
+      setWizardSession(session);
+      setWizardMessages([]);
+    },
+  });
+
+  const sendWizardMessageMutation = useMutation({
+    mutationFn: ({ sessionId, message }: { sessionId: string; message: string }) =>
+      apiClient.sendChatMessage(sessionId, { message }),
+    onSuccess: (response) => {
+      if (response.message && response.response) {
+        setWizardMessages(prev => [...prev, response.message, {
+          id: `assistant-${Date.now()}`,
+          session_id: response.session_id,
+          role: 'assistant',
+          content: response.response || 'I received your message.',
+          timestamp: new Date().toISOString(),
+        }]);
+      }
+      setWizardInput('');
+      setIsWizardTyping(false);
+    },
+    onError: () => {
+      setIsWizardTyping(false);
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -174,6 +223,47 @@ const AgentManagement: React.FC = () => {
     navigate(`/workflows?agent=${agentId}`);
   };
 
+  const handleStartWizard = () => {
+    if (!formData.description.trim()) return;
+    setIsWizardTyping(true);
+    createWizardSessionMutation.mutate(formData.description);
+    setWizardDialogOpen(true);
+  };
+
+  const handleSendWizardMessage = () => {
+    if (!wizardInput.trim() || !wizardSession) return;
+    setIsWizardTyping(true);
+
+    // Add user message to the chat
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      session_id: wizardSession.id,
+      role: 'user',
+      content: wizardInput,
+      timestamp: new Date().toISOString(),
+    };
+
+    setWizardMessages(prev => [...prev, userMessage]);
+    sendWizardMessageMutation.mutate({
+      sessionId: wizardSession.id,
+      message: wizardInput,
+    });
+  };
+
+  const handleCloseWizard = () => {
+    setWizardDialogOpen(false);
+    setWizardSession(null);
+    setWizardMessages([]);
+    setWizardInput('');
+  };
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [wizardMessages]);
+
   const getStatusIcon = (isActive: boolean) => {
     return isActive ? (
       <CheckCircle color="success" />
@@ -222,11 +312,18 @@ const AgentManagement: React.FC = () => {
             Refresh
           </Button>
           <Button
+            variant="outlined"
+            startIcon={<AutoAwesome />}
+            onClick={() => setWizardDialogOpen(true)}
+          >
+            AI Wizard
+          </Button>
+          <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => setCreateDialogOpen(true)}
           >
-            Create Agent
+            Manual Create
           </Button>
         </Box>
       </Box>
@@ -628,6 +725,212 @@ const AgentManagement: React.FC = () => {
           >
             {updateAgentMutation.isPending ? 'Updating...' : 'Update Agent'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* AI-Assisted Agent Creation Wizard Dialog */}
+      <Dialog
+        open={wizardDialogOpen}
+        onClose={handleCloseWizard}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: { height: '80vh', maxHeight: '800px' },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <AutoAwesome sx={{ color: 'primary.main' }} />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                🤖 AI Agent Creation Wizard
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Describe your agent and let AI help you create it
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <Divider />
+
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {!wizardSession ? (
+            /* Initial Description Input */
+            <Box sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <Box sx={{ maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
+                <SmartToy sx={{ fontSize: 64, color: 'primary.main', mb: 3 }} />
+                <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+                  Describe Your Agent
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+                  Tell the AI assistant what kind of agent you want to create. Be as specific as possible about its purpose, capabilities, and requirements.
+                </Typography>
+
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="e.g., Create an agent that analyzes emails from my Gmail account, categorizes them by importance, and extracts key information like sender, subject, and urgency level."
+                  sx={{ mb: 3 }}
+                />
+
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                  <InputLabel>AI Model</InputLabel>
+                  <Select
+                    value={formData.model_name}
+                    label="AI Model"
+                    onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
+                  >
+                    {availableModels?.models?.map((model) => (
+                      <MenuItem key={model} value={model}>
+                        {model}
+                      </MenuItem>
+                    )) || (
+                      <MenuItem value="qwen3:30b-a3b-thinking-2507-q8_0">
+                        Qwen 3 30B (Thinking) - Default
+                      </MenuItem>
+                    )}
+                  </Select>
+                </FormControl>
+
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<AutoAwesome />}
+                  onClick={handleStartWizard}
+                  disabled={!formData.description.trim() || createWizardSessionMutation.isPending}
+                  sx={{ minWidth: 200 }}
+                >
+                  {createWizardSessionMutation.isPending ? 'Starting Wizard...' : 'Start AI Creation'}
+                </Button>
+              </Box>
+            </Box>
+          ) : (
+            /* Chat Interface */
+            <>
+              <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+                {wizardMessages.map((message) => (
+                  <Box
+                    key={message.id}
+                    sx={{
+                      display: 'flex',
+                      mb: 2,
+                      justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        maxWidth: '70%',
+                        alignItems: 'flex-start',
+                        gap: 1,
+                      }}
+                    >
+                      {message.role === 'assistant' && (
+                        <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+                          <SmartToy fontSize="small" />
+                        </Avatar>
+                      )}
+                      <Paper
+                        elevation={1}
+                        sx={{
+                          p: 2,
+                          bgcolor: message.role === 'user' ? 'primary.main' : 'background.paper',
+                          color: message.role === 'user' ? 'white' : 'text.primary',
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {message.content}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: 'block',
+                            mt: 1,
+                            color: message.role === 'user' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                          }}
+                        >
+                          {new Date(message.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </Typography>
+                      </Paper>
+                      {message.role === 'user' && (
+                        <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>
+                          <Person fontSize="small" />
+                        </Avatar>
+                      )}
+                    </Box>
+                  </Box>
+                ))}
+
+                {isWizardTyping && (
+                  <Box sx={{ display: 'flex', mb: 2, alignItems: 'flex-start', gap: 1 }}>
+                    <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+                      <SmartToy fontSize="small" />
+                    </Avatar>
+                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        AI is thinking...
+                      </Typography>
+                    </Paper>
+                  </Box>
+                )}
+
+                <div ref={messagesEndRef} />
+              </Box>
+
+              <Divider />
+              <Box sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    fullWidth
+                    value={wizardInput}
+                    onChange={(e) => setWizardInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendWizardMessage();
+                      }
+                    }}
+                    placeholder="Ask questions or provide additional requirements..."
+                    disabled={sendWizardMessageMutation.isPending}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={handleSendWizardMessage}
+                    disabled={!wizardInput.trim() || sendWizardMessageMutation.isPending}
+                    sx={{ minWidth: 60 }}
+                  >
+                    <Send />
+                  </Button>
+                </Box>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, pt: 1 }}>
+          <Button onClick={handleCloseWizard} variant="outlined">
+            Close
+          </Button>
+          {wizardSession && (
+            <Button
+              variant="contained"
+              startIcon={<CheckCircle />}
+              onClick={() => {
+                // Here you could add logic to finalize the agent creation
+                // For now, just close the wizard
+                handleCloseWizard();
+              }}
+            >
+              Finalize Agent
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

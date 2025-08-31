@@ -30,6 +30,7 @@ import {
   Speed,
   Engineering,
   Security,
+  Chat,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
 import { useSelector, useDispatch } from 'react-redux';
@@ -96,6 +97,12 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
       path: '/agents',
       label: 'Agent Management',
       icon: <Engineering />,
+    },
+    {
+      type: 'item',
+      path: '/chat',
+      label: 'AI Chat',
+      icon: <Chat />,
     },
     {
       type: 'divider',

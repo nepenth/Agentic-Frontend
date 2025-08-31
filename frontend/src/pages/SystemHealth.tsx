@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Grid,
@@ -28,19 +28,216 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '../services/api';
 import { CardSkeleton } from '../components';
 
+// Types for better type safety
+interface GPUData {
+  id: number;
+  name: string;
+  usage: number;
+  memoryUsed: number;
+  memoryTotal: number;
+  temperature: string | number;
+  frequency: string | number;
+  memoryFrequency: string | number;
+  power: string | number;
+}
+
+interface SystemMetrics {
+  cpu?: {
+    usage?: number;
+    temperature?: string | number;
+    cores?: string | number;
+    frequency?: string | number;
+    loadAverage?: number[] | string;
+  };
+  memory?: {
+    used?: number;
+    total?: number;
+    percentage?: number;
+    swapUsed?: string | number;
+    swapTotal?: string | number;
+  };
+  disk?: {
+    used?: string | number;
+    total?: string | number;
+    percentage?: number;
+    readSpeed?: string | number;
+    writeSpeed?: string | number;
+  };
+  network?: {
+    download?: string | number;
+    upload?: string | number;
+    connections?: string | number;
+    latency?: string | number;
+  };
+  gpus?: GPUData[];
+  system?: {
+    uptime?: string | number;
+    loadAverage?: number[] | string;
+    processes?: string | number;
+    health?: string;
+  };
+}
+
 // No mock data - we will show "No data available" when API fails
+
+// Modern GPU Card Component with proper error handling
+const GPUCard: React.FC<{ gpu: GPUData; index: number }> = ({ gpu, index }) => {
+  const formatValue = (value: string | number, unit: string = ''): string => {
+    if (value === 'N/A' || value === null || value === undefined) return 'N/A';
+    if (typeof value === 'number') {
+      return unit ? `${value.toFixed(1)}${unit}` : value.toString();
+    }
+    return `${value}${unit}`;
+  };
+
+  return (
+    <Box key={`gpu-${gpu.id}-${index}`} sx={{ mb: 3 }}>
+      <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'primary.main' }}>
+        GPU {gpu.id + 1}: {gpu.name || 'Unknown GPU'}
+      </Typography>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} sm={6} md={4} lg={2}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              textAlign: 'center',
+              border: 1,
+              borderColor: 'divider',
+              minHeight: 100,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': { borderColor: 'primary.main', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Videocam sx={{ fontSize: 24, color: 'primary.main', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">Usage</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {formatValue(gpu.usage, '%')}
+            </Typography>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4} lg={2}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              textAlign: 'center',
+              border: 1,
+              borderColor: 'divider',
+              minHeight: 100,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': { borderColor: 'info.main', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Memory sx={{ fontSize: 24, color: 'info.main', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">Memory</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {formatValue(gpu.memoryUsed, 'GB')}/{formatValue(gpu.memoryTotal, 'GB')}
+            </Typography>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4} lg={2}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              textAlign: 'center',
+              border: 1,
+              borderColor: 'divider',
+              minHeight: 100,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': { borderColor: 'error.main', transform: 'translateY(-2px)' }
+            }}
+          >
+            <DeviceThermostat sx={{ fontSize: 24, color: 'error.main', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">Temperature</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {formatValue(gpu.temperature, '°F')}
+            </Typography>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4} lg={2}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              textAlign: 'center',
+              border: 1,
+              borderColor: 'divider',
+              minHeight: 100,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': { borderColor: 'warning.main', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Speed sx={{ fontSize: 24, color: 'warning.main', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">GPU Freq</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {formatValue(gpu.frequency, 'MHz')}
+            </Typography>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4} lg={2}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              textAlign: 'center',
+              border: 1,
+              borderColor: 'divider',
+              minHeight: 100,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': { borderColor: 'success.main', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Timeline sx={{ fontSize: 24, color: 'success.main', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">Mem Freq</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {formatValue(gpu.memoryFrequency, 'MHz')}
+            </Typography>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4} lg={2}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              textAlign: 'center',
+              border: 1,
+              borderColor: 'divider',
+              minHeight: 100,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': { borderColor: 'secondary.main', transform: 'translateY(-2px)' }
+            }}
+          >
+            <TrendingUp sx={{ fontSize: 24, color: 'secondary.main', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">Power</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {formatValue(gpu.power, 'W')}
+            </Typography>
+          </Paper>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+};
 
 const SystemHealth: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const {
-    data: systemData,
+    data: rawSystemData,
     isLoading,
     error,
     refetch,
   } = useQuery({
     queryKey: ['system-metrics'],
-    queryFn: async () => {
+    queryFn: async (): Promise<SystemMetrics | null> => {
       try {
         // Get real system metrics from individual endpoints
         const [
@@ -53,63 +250,97 @@ const SystemHealth: React.FC = () => {
           swapMetrics,
           systemInfo
         ] = await Promise.all([
-          apiClient.getSystemMetricsCpu().catch(() => null),
-          apiClient.getSystemMetricsMemory().catch(() => null),
-          apiClient.getSystemMetricsDisk().catch(() => null),
-          apiClient.getSystemMetricsNetwork().catch(() => null),
-          apiClient.getSystemMetricsGpu().catch(() => null),
-          apiClient.getSystemMetricsLoad().catch(() => null),
-          apiClient.getSystemMetricsSwap().catch(() => null),
-          apiClient.getSystemInfo().catch(() => null)
+          apiClient.getSystemMetricsCpu().catch((error) => {
+            console.warn('Failed to fetch CPU metrics:', error);
+            return null;
+          }),
+          apiClient.getSystemMetricsMemory().catch((error) => {
+            console.warn('Failed to fetch memory metrics:', error);
+            return null;
+          }),
+          apiClient.getSystemMetricsDisk().catch((error) => {
+            console.warn('Failed to fetch disk metrics:', error);
+            return null;
+          }),
+          apiClient.getSystemMetricsNetwork().catch((error) => {
+            console.warn('Failed to fetch network metrics:', error);
+            return null;
+          }),
+          apiClient.getSystemMetricsGpu().catch((error) => {
+            console.warn('Failed to fetch GPU metrics:', error);
+            console.log('GPU API error details:', error?.response?.data || error?.message);
+            return null;
+          }),
+          apiClient.getSystemMetricsLoad().catch((error) => {
+            console.warn('Failed to fetch load metrics:', error);
+            return null;
+          }),
+          apiClient.getSystemMetricsSwap().catch((error) => {
+            console.warn('Failed to fetch swap metrics:', error);
+            return null;
+          }),
+          apiClient.getSystemInfo().catch((error) => {
+            console.warn('Failed to fetch system info:', error);
+            return null;
+          })
         ]);
 
+        // Debug: Log raw GPU data
+        console.log('Raw GPU metrics from API:', gpuMetrics);
+
         // Transform the data to match our component's expected format
-        return {
+        const transformedData: SystemMetrics = {
           cpu: cpuMetrics ? {
             usage: cpuMetrics.usage_percent,
             temperature: cpuMetrics.temperature_celsius || 'N/A',
             cores: cpuMetrics.count?.logical || 'N/A',
             frequency: cpuMetrics.frequency_mhz?.current ? cpuMetrics.frequency_mhz.current / 1000 : 'N/A', // Convert MHz to GHz
             loadAverage: loadMetrics ? [loadMetrics['1m'], loadMetrics['5m'], loadMetrics['15m']] : 'N/A',
-          } : null,
+          } : undefined,
           memory: memoryMetrics ? {
             used: memoryMetrics.used_gb,
             total: memoryMetrics.total_gb,
             percentage: memoryMetrics.usage_percent,
             swapUsed: swapMetrics?.used_gb || 'N/A',
             swapTotal: swapMetrics?.total_gb || 'N/A',
-          } : null,
+          } : undefined,
           disk: diskMetrics ? {
             used: diskMetrics.usage?.used_gb || 'N/A',
             total: diskMetrics.usage?.total_gb || 'N/A',
             percentage: diskMetrics.usage?.usage_percent || 'N/A',
             readSpeed: diskMetrics.io?.read_bytes_per_sec ? diskMetrics.io.read_bytes_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
             writeSpeed: diskMetrics.io?.write_bytes_per_sec ? diskMetrics.io.write_bytes_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
-          } : null,
+          } : undefined,
           network: networkMetrics ? {
             download: networkMetrics.speeds?.bytes_recv_per_sec ? networkMetrics.speeds.bytes_recv_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
             upload: networkMetrics.speeds?.bytes_sent_per_sec ? networkMetrics.speeds.bytes_sent_per_sec / (1024 * 1024) : 'N/A', // Convert to MB/s
             connections: networkMetrics.io?.packets_recv || 'N/A',
             latency: 'N/A', // Not available in current API
-          } : null,
-          gpus: Array.isArray(gpuMetrics) ? gpuMetrics.map((gpu: any) => ({
-            id: gpu.index,
-            name: gpu.name,
-            usage: gpu.utilization?.gpu_percent || 0,
-            memoryUsed: gpu.memory?.used_mb ? gpu.memory.used_mb / 1024 : 0, // Convert MB to GB
-            memoryTotal: gpu.memory?.total_mb ? gpu.memory.total_mb / 1024 : 0, // Convert MB to GB
-            temperature: gpu.temperature_fahrenheit || 'N/A',
-            frequency: gpu.clocks?.graphics_mhz || 'N/A',
-            memoryFrequency: gpu.clocks?.memory_mhz || 'N/A',
-            power: gpu.power?.usage_watts || 'N/A',
-          })) : [],
+          } : undefined,
+          gpus: Array.isArray(gpuMetrics) ? gpuMetrics.map((gpu: any, index: number) => {
+            console.log(`Processing GPU ${index}:`, gpu);
+            return {
+              id: gpu.index ?? index,
+              name: gpu.name || `GPU ${index + 1}`,
+              usage: gpu.utilization?.gpu_percent || 0,
+              memoryUsed: gpu.memory?.used_mb ? gpu.memory.used_mb / 1024 : 0, // Convert MB to GB
+              memoryTotal: gpu.memory?.total_mb ? gpu.memory.total_mb / 1024 : 0, // Convert MB to GB
+              temperature: gpu.temperature_fahrenheit || 'N/A',
+              frequency: gpu.clocks?.graphics_mhz || 'N/A',
+              memoryFrequency: gpu.clocks?.memory_mhz || 'N/A',
+              power: gpu.power?.usage_watts || 'N/A',
+            };
+          }) : [],
           system: systemInfo ? {
             uptime: systemInfo.uptime?.formatted || 'N/A',
             loadAverage: loadMetrics ? [loadMetrics['1m'], loadMetrics['5m'], loadMetrics['15m']] : 'N/A',
             processes: systemInfo.processes?.total_count || 'N/A',
             health: 'healthy',
-          } : null,
+          } : undefined,
         };
+
+        console.log('Transformed system data:', transformedData);
+        return transformedData;
       } catch (error) {
         console.warn('Failed to fetch system metrics:', error);
         // Return null to indicate no data available
@@ -118,6 +349,46 @@ const SystemHealth: React.FC = () => {
     },
     refetchInterval: 10000, // Refetch every 10 seconds
   });
+
+  // Memoized data processing for better performance
+  const systemData: SystemMetrics | null = useMemo((): SystemMetrics | null => {
+    if (!rawSystemData) return null;
+
+    // Enhanced GPU data processing with validation
+    const processedGpus: GPUData[] = Array.isArray(rawSystemData.gpus)
+      ? rawSystemData.gpus.map((gpu: any, index: number) => {
+        console.log(`Processing GPU ${index}:`, gpu);
+
+        // Validate GPU data structure
+        if (!gpu || typeof gpu !== 'object') {
+          console.warn(`Invalid GPU data at index ${index}:`, gpu);
+          return null;
+        }
+
+        const processedGpu: GPUData = {
+          id: typeof gpu.id === 'number' ? gpu.id : index,
+          name: gpu.name || `GPU ${index + 1}`,
+          usage: gpu.usage || 0,
+          memoryUsed: gpu.memoryUsed || 0,
+          memoryTotal: gpu.memoryTotal || 0,
+          temperature: gpu.temperature || 'N/A',
+          frequency: gpu.frequency || 'N/A',
+          memoryFrequency: gpu.memoryFrequency || 'N/A',
+          power: gpu.power || 'N/A',
+        };
+
+        console.log(`Processed GPU ${index}:`, processedGpu);
+        return processedGpu;
+      }).filter((gpu): gpu is GPUData => gpu !== null)
+      : [];
+
+    console.log('Total GPUs processed:', processedGpus.length);
+
+    return {
+      ...rawSystemData,
+      gpus: processedGpus,
+    };
+  }, [rawSystemData]);
 
   // Fetch Ollama health status
   const {
@@ -166,11 +437,7 @@ const SystemHealth: React.FC = () => {
   }
 
   return (
-    <Box sx={{
-      minHeight: '100%',
-      overflow: 'auto',
-      paddingBottom: 4
-    }}>
+    <Box sx={{ paddingBottom: 4 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
@@ -445,7 +712,7 @@ const SystemHealth: React.FC = () => {
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                       <Typography variant="body1" sx={{ fontWeight: 500 }}>Network I/O</Typography>
                       <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        ↓ {systemData?.network?.download || 45.2} MB/s ↑ {systemData?.network?.upload || 12.8} MB/s
+                        ↓ {typeof systemData?.network?.download === 'number' ? systemData.network.download.toFixed(2) : '45.20'} MB/s ↑ {typeof systemData?.network?.upload === 'number' ? systemData.network.upload.toFixed(2) : '12.80'} MB/s
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
@@ -500,17 +767,17 @@ const SystemHealth: React.FC = () => {
           <Card elevation={0} sx={{ mb: 4 }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                GPU Monitoring (Tesla P40 × 2)
+                GPU Monitoring {systemData?.gpus && systemData.gpus.length > 0 ? `(${systemData.gpus.length} GPUs detected)` : ''}
               </Typography>
 
               {isLoading ? (
                 <Box>
                   {[...Array(2)].map((_, index) => (
-                    <Box key={index} sx={{ mb: 3 }}>
+                    <Box key={`skeleton-${index}`} sx={{ mb: 3 }}>
                       <Skeleton variant="text" width="40%" height={28} />
                       <Grid container spacing={2}>
                         {[...Array(6)].map((_, i) => (
-                          <Grid item xs={12} sm={6} md={2} key={i}>
+                          <Grid item xs={12} sm={6} md={2} key={`skeleton-item-${i}`}>
                             <Skeleton variant="rectangular" width="100%" height={60} sx={{ borderRadius: 1 }} />
                           </Grid>
                         ))}
@@ -520,63 +787,31 @@ const SystemHealth: React.FC = () => {
                 </Box>
               ) : (
                 <Box>
-                  {(systemData?.gpus || []).map((gpu: any, _index: number) => (
-                    <Box key={gpu.id} sx={{ mb: 3 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'primary.main' }}>
-                        GPU {gpu.id + 1}: {gpu.name}
+                  {systemData?.gpus && systemData.gpus.length > 0 ? (
+                    <>
+                      {systemData.gpus.map((gpu: GPUData, index: number) => (
+                        <GPUCard key={`gpu-${gpu.id}-${index}`} gpu={gpu} index={index} />
+                      ))}
+                    </>
+                  ) : (
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                      <Videocam sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                        No GPU data available
                       </Typography>
-
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6} md={4} lg={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
-                            <Videocam sx={{ fontSize: 24, color: 'primary.main', mb: 1 }} />
-                            <Typography variant="body2" color="text.secondary">Usage</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.usage}%</Typography>
-                          </Paper>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={4} lg={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
-                            <Memory sx={{ fontSize: 24, color: 'info.main', mb: 1 }} />
-                            <Typography variant="body2" color="text.secondary">Memory</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.memoryUsed}GB/{gpu.memoryTotal}GB</Typography>
-                          </Paper>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={4} lg={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
-                            <DeviceThermostat sx={{ fontSize: 24, color: 'error.main', mb: 1 }} />
-                            <Typography variant="body2" color="text.secondary">Temperature</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.temperature}°F</Typography>
-                          </Paper>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={4} lg={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
-                            <Speed sx={{ fontSize: 24, color: 'warning.main', mb: 1 }} />
-                            <Typography variant="body2" color="text.secondary">GPU Freq</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.frequency}MHz</Typography>
-                          </Paper>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={4} lg={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
-                            <Timeline sx={{ fontSize: 24, color: 'success.main', mb: 1 }} />
-                            <Typography variant="body2" color="text.secondary">Mem Freq</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.memoryFrequency}MHz</Typography>
-                          </Paper>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={4} lg={2}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', border: 1, borderColor: 'divider', minHeight: 100 }}>
-                            <TrendingUp sx={{ fontSize: 24, color: 'secondary.main', mb: 1 }} />
-                            <Typography variant="body2" color="text.secondary">Power</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>{gpu.power}W</Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
+                      <Typography variant="body2" color="text.secondary">
+                        GPU monitoring data is not available from the backend. This could be due to:
+                      </Typography>
+                      <Box sx={{ mt: 2, textAlign: 'left', maxWidth: 400, mx: 'auto' }}>
+                        <Typography variant="body2" color="text.secondary" component="div">
+                          • Backend service not running<br/>
+                          • GPU drivers not installed<br/>
+                          • NVIDIA GPUs not detected<br/>
+                          • API endpoint returning empty data
+                        </Typography>
+                      </Box>
                     </Box>
-                  ))}
+                  )}
                 </Box>
               )}
             </CardContent>

@@ -31,6 +31,8 @@ import {
   Info,
   Warning,
   Error,
+  CheckCircle,
+  Refresh,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import webSocketService from '../services/websocket';
@@ -67,7 +69,7 @@ const LogsViewer: React.FC = () => {
       id: 'all',
       name: 'All Logs',
       filters: {},
-      active: true,
+      active: true, // This should be true for the default channel
       logs: [],
       color: '#1976d2',
       connectionType: 'websocket',
@@ -77,6 +79,8 @@ const LogsViewer: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<string>('all');
   const [autoScroll, setAutoScroll] = useState(true);
   const [maxLogs, setMaxLogs] = useState(1000);
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
@@ -101,8 +105,25 @@ const LogsViewer: React.FC = () => {
     }
   }, [channels, autoScroll]);
 
+  // Listen to WebSocket connection status
+  useEffect(() => {
+    const unsubscribe = webSocketService.onConnectionStatus((status, error) => {
+      console.log('WebSocket connection status:', status, error);
+      setConnectionStatus(status);
+      if (error) {
+        setConnectionError(error);
+      } else if (status === 'connected') {
+        setConnectionError(null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
   // Handle incoming log messages
   const handleLogMessage = useCallback((logEntry: LogEntry) => {
+    console.log('Received log message:', logEntry);
+
     setChannels(prevChannels =>
       prevChannels.map(channel => {
         // Check if log matches channel filters
@@ -111,12 +132,15 @@ const LogsViewer: React.FC = () => {
           return logEntry[key as keyof LogEntry] === value;
         });
 
+        console.log(`Channel ${channel.name}: matches filters = ${matchesFilters}, channel.id === 'all' = ${channel.id === 'all'}`);
+
         if (matchesFilters || channel.id === 'all') {
           const newLogs = [...channel.logs, logEntry];
           // Keep only the most recent logs
           if (newLogs.length > maxLogs) {
             newLogs.splice(0, newLogs.length - maxLogs);
           }
+          console.log(`Adding log to channel ${channel.name}, new log count: ${newLogs.length}`);
           return { ...channel, logs: newLogs };
         }
         return channel;
@@ -125,20 +149,63 @@ const LogsViewer: React.FC = () => {
   }, [maxLogs]);
 
   // Start/stop log streaming
-  const toggleLogStreaming = useCallback(() => {
+  const toggleLogStreaming = useCallback(async () => {
     const activeChannel = channels.find(c => c.id === selectedChannel);
-    if (!activeChannel) return;
+    if (!activeChannel) {
+      console.error('No active channel found for selectedChannel:', selectedChannel);
+      setConnectionError('No active channel selected');
+      setConnectionStatus('error');
+      return;
+    }
+
+    console.log('Toggle streaming for channel:', activeChannel.name, 'active:', activeChannel.active);
 
     if (unsubscribeRef.current) {
       // Stop streaming
+      console.log('Stopping log streaming');
+      setConnectionStatus('disconnected');
+      setConnectionError(null);
       unsubscribeRef.current();
       unsubscribeRef.current = null;
     } else {
       // Start streaming
-      unsubscribeRef.current = webSocketService.subscribeToLogs(
-        handleLogMessage,
-        activeChannel.filters
-      );
+      console.log('Starting log streaming with filters:', activeChannel.filters);
+      setConnectionStatus('connecting');
+      setConnectionError(null);
+
+      try {
+        // Check if user is authenticated
+        const token = apiClient.getAuthToken();
+        if (!token) {
+          setConnectionError('Authentication required. Please log in to access live logs.');
+          setConnectionStatus('error');
+          return;
+        }
+
+        unsubscribeRef.current = webSocketService.subscribeToLogs(
+          handleLogMessage,
+          activeChannel.filters
+        );
+
+        // Check connection status after a short delay
+        setTimeout(() => {
+          if (webSocketService.isConnected()) {
+            setConnectionStatus('connected');
+          } else {
+            setConnectionError('Failed to connect to WebSocket. Backend may not be running.');
+            setConnectionStatus('error');
+            if (unsubscribeRef.current) {
+              unsubscribeRef.current();
+              unsubscribeRef.current = null;
+            }
+          }
+        }, 2000);
+
+      } catch (error) {
+        console.error('Error starting log streaming:', error);
+        setConnectionError('Failed to start log streaming. Please try again.');
+        setConnectionStatus('error');
+      }
     }
   }, [channels, selectedChannel, handleLogMessage]);
 
@@ -209,6 +276,9 @@ const LogsViewer: React.FC = () => {
 
   const selectedChannelData = channels.find(c => c.id === selectedChannel);
 
+  // Debug logging
+  console.log('LogsViewer render - Channels:', channels.length, 'Selected:', selectedChannel, 'Data:', !!selectedChannelData);
+
   return (
     <Box>
       {/* Header */}
@@ -234,17 +304,100 @@ const LogsViewer: React.FC = () => {
             label="Auto-scroll"
           />
 
-          <Button
-            variant={unsubscribeRef.current ? "outlined" : "contained"}
-            color={unsubscribeRef.current ? "error" : "primary"}
-            startIcon={unsubscribeRef.current ? <Stop /> : <PlayArrow />}
-            onClick={toggleLogStreaming}
-            disabled={!selectedChannelData?.active && selectedChannel !== 'all'}
-          >
-            {unsubscribeRef.current ? 'Stop Streaming' : 'Start Streaming'}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant={unsubscribeRef.current ? "outlined" : "contained"}
+              color={
+                connectionStatus === 'error' ? 'error' :
+                connectionStatus === 'connected' ? 'success' :
+                connectionStatus === 'connecting' ? 'warning' :
+                unsubscribeRef.current ? "error" : "primary"
+              }
+              startIcon={
+                connectionStatus === 'connecting' ? <Refresh sx={{ animation: 'spin 1s linear infinite' }} /> :
+                connectionStatus === 'connected' ? <CheckCircle /> :
+                connectionStatus === 'error' ? <Error /> :
+                unsubscribeRef.current ? <Stop /> : <PlayArrow />
+              }
+              onClick={toggleLogStreaming}
+              disabled={(!selectedChannelData?.active && selectedChannel !== 'all') || connectionStatus === 'connecting'}
+            >
+              {connectionStatus === 'connecting' ? 'Connecting...' :
+               connectionStatus === 'connected' ? 'Streaming' :
+               connectionStatus === 'error' ? 'Connection Failed' :
+               unsubscribeRef.current ? 'Stop Streaming' : 'Start Streaming'}
+            </Button>
+
+            {/* Debug button to test WebSocket without auth */}
+            <Button
+              variant="outlined"
+              size="small"
+              color="secondary"
+              onClick={() => {
+                console.log('Testing WebSocket connection...');
+                // Try to connect without authentication for testing
+                webSocketService.connect('logs');
+                setTimeout(() => {
+                  if (webSocketService.isConnected()) {
+                    console.log('WebSocket test successful');
+                    setConnectionStatus('connected');
+                  } else {
+                    console.log('WebSocket test failed');
+                    setConnectionStatus('error');
+                    setConnectionError('WebSocket connection test failed');
+                  }
+                }, 2000);
+              }}
+            >
+              Test WS
+            </Button>
+
+            {/* Debug button to test backend health */}
+            <Button
+              variant="outlined"
+              size="small"
+              color="info"
+              onClick={async () => {
+                try {
+                  console.log('Testing backend health...');
+                  const response = await apiClient.getHealth();
+                  console.log('Backend health check successful:', response);
+                  setConnectionError('Backend is running - health check passed');
+                } catch (error) {
+                  console.error('Backend health check failed:', error);
+                  setConnectionError('Backend health check failed - backend may not be running');
+                  setConnectionStatus('error');
+                }
+              }}
+            >
+              Test API
+            </Button>
+          </Box>
         </Box>
       </Box>
+
+      {/* Connection Status Alert */}
+      {connectionStatus !== 'disconnected' && (
+        <Alert
+          severity={
+            connectionStatus === 'connected' ? 'success' :
+            connectionStatus === 'connecting' ? 'info' :
+            'error'
+          }
+          sx={{ mb: 3 }}
+          action={
+            connectionStatus === 'error' ? (
+              <Button color="inherit" size="small" onClick={toggleLogStreaming}>
+                Retry
+              </Button>
+            ) : undefined
+          }
+        >
+          {connectionStatus === 'connecting' && 'Attempting to connect to live log stream...'}
+          {connectionStatus === 'connected' && `Successfully connected to live log stream for "${selectedChannelData?.name}"`}
+          {connectionStatus === 'error' && (connectionError || 'Failed to connect to live log stream')}
+        </Alert>
+      )}
 
       {/* Channel Management */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -409,6 +562,24 @@ const LogsViewer: React.FC = () => {
               p: 2,
               fontFamily: 'monospace',
               fontSize: '0.875rem',
+              // Ensure scroll bars are visible
+              '&::-webkit-scrollbar': {
+                width: '8px',
+                height: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderRadius: '4px',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                },
+              },
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.1)',
             }}
           >
             {selectedChannelData?.logs.length === 0 ? (
@@ -479,14 +650,6 @@ const LogsViewer: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Connection Status */}
-      {unsubscribeRef.current && (
-        <Alert severity="success" sx={{ mt: 2 }}>
-          <Typography variant="body2">
-            Connected to live log stream for channel "{selectedChannelData?.name}"
-          </Typography>
-        </Alert>
-      )}
     </Box>
   );
 };

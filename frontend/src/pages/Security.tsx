@@ -97,15 +97,22 @@ const Security: React.FC = () => {
     refetchInterval: 30000,
   });
 
-  // Fetch security limits
-  const {
-    data: securityLimits,
-    isLoading: limitsLoading,
-  } = useQuery({
-    queryKey: ['security-limits'],
-    queryFn: () => apiClient.getSecurityLimits(),
-    refetchInterval: 60000, // Refetch every minute
-  });
+  // Security limits are included in security status response
+  const securityLimits = securityStatus ? {
+    concurrent_agents: {
+      current: securityStatus.current_usage.active_agents,
+      max: securityStatus.resource_limits.max_concurrent_agents,
+    },
+    memory_usage: {
+      current_mb: securityStatus.current_usage.total_memory_mb,
+      max_mb: securityStatus.resource_limits.max_memory_mb,
+    },
+    rate_limits: {
+      tool_execution_per_hour: 100, // Default values from backend docs
+      agent_creation_per_hour: 10,
+      external_requests_per_hour: 1000,
+    },
+  } : null;
 
   // Resolve incident mutation
   const resolveIncidentMutation = useMutation({
@@ -127,6 +134,9 @@ const Security: React.FC = () => {
       refetchIncidents(),
     ]);
   };
+
+  // Loading states
+  const limitsLoading = statusLoading;
 
   const handleResolveIncident = (incident: SecurityIncident) => {
     setSelectedIncident(incident);
@@ -208,7 +218,23 @@ const Security: React.FC = () => {
             </Button>
           }
         >
-          Failed to load security data. Please try again.
+          <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+            Failed to load security data
+          </Typography>
+          <Typography variant="body2">
+            {statusError?.message?.includes('500')
+              ? "Server error (500): The backend service may not be running or has encountered an internal error."
+              : statusError?.message?.includes('404')
+              ? "Endpoint not found (404): The security API endpoints may not be available."
+              : statusError?.message?.includes('Network')
+              ? "Network error: Unable to connect to the backend. Please check if the backend service is running."
+              : "Please try again. If the problem persists, check the backend service status."}
+          </Typography>
+          {statusError?.message && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              Error: {statusError.message}
+            </Typography>
+          )}
         </Alert>
       </Box>
     );
