@@ -27,6 +27,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../services/api';
 import { CardSkeleton } from '../components';
+import type { HttpClientMetrics, ModelPerformanceMetrics } from '../types';
 
 // Types for better type safety
 interface GPUData {
@@ -222,6 +223,140 @@ const GPUCard: React.FC<{ gpu: GPUData; index: number }> = ({ gpu, index }) => {
             </Typography>
           </Paper>
         </Grid>
+
+        {/* HTTP Client & AI Model Performance Details */}
+        <Grid item xs={12}>
+          <Card elevation={0} sx={{ mb: 4 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                HTTP Client & AI Model Performance
+              </Typography>
+
+              <Grid container spacing={3}>
+                {/* HTTP Client Metrics */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'secondary.main' }}>
+                    HTTP Client Performance
+                  </Typography>
+                  {httpLoading ? (
+                    <Box>
+                      {[...Array(4)].map((_, index) => (
+                        <Box key={index} sx={{ mb: 2 }}>
+                          <Skeleton variant="text" width="40%" height={24} />
+                          <Skeleton variant="rectangular" width="100%" height={8} sx={{ borderRadius: 1 }} />
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : httpMetrics ? (
+                    <Box>
+                      <Box sx={{ mb: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 500 }}>Request Success Rate</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            {((httpMetrics.successful_requests / httpMetrics.total_requests) * 100).toFixed(1)}%
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={(httpMetrics.successful_requests / httpMetrics.total_requests) * 100}
+                          sx={{ height: 8, borderRadius: 1 }}
+                          color="secondary"
+                        />
+                      </Box>
+
+                      <Box sx={{ mb: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 500 }}>Average Response Time</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            {httpMetrics.average_response_time_ms.toFixed(0)}ms
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.min((httpMetrics.average_response_time_ms / 5000) * 100, 100)}
+                          sx={{ height: 8, borderRadius: 1 }}
+                          color="secondary"
+                        />
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                        <Chip
+                          label={`Total: ${httpMetrics.total_requests}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={`Failed: ${httpMetrics.total_requests - httpMetrics.successful_requests}`}
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                        />
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      HTTP client metrics not available
+                    </Typography>
+                  )}
+                </Grid>
+
+                {/* AI Model Performance */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'success.main' }}>
+                    AI Model Performance
+                  </Typography>
+                  {modelPerformanceLoading ? (
+                    <Box>
+                      {[...Array(4)].map((_, index) => (
+                        <Box key={index} sx={{ mb: 2 }}>
+                          <Skeleton variant="text" width="40%" height={24} />
+                          <Skeleton variant="rectangular" width="100%" height={8} sx={{ borderRadius: 1 }} />
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : modelPerformance && modelPerformance.length > 0 ? (
+                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                      {modelPerformance.slice(0, 5).map((metric, index) => (
+                        <Card key={`${metric.model_name}-${metric.task_type}`} sx={{ mb: 2 }}>
+                          <CardContent sx={{ py: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                {metric.model_name}
+                              </Typography>
+                              <Chip
+                                label={metric.task_type}
+                                size="small"
+                                variant="outlined"
+                              />
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Success: {(metric.success_rate * 100).toFixed(1)}%
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Avg Time: {metric.average_response_time_ms}ms
+                              </Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={metric.success_rate * 100}
+                              sx={{ height: 6, borderRadius: 1 }}
+                              color="success"
+                            />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      AI model performance metrics not available
+                    </Typography>
+                  )}
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
     </Box>
   );
@@ -398,6 +533,26 @@ const SystemHealth: React.FC = () => {
     queryKey: ['ollama-health'],
     queryFn: () => apiClient.getOllamaHealth(),
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Fetch HTTP client metrics (Phase 1.2)
+  const {
+    data: httpMetrics,
+    isLoading: httpLoading,
+  } = useQuery<HttpClientMetrics>({
+    queryKey: ['http-metrics'],
+    queryFn: () => apiClient.getHttpClientMetrics(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Fetch model performance metrics (Phase 1.3)
+  const {
+    data: modelPerformance,
+    isLoading: modelPerformanceLoading,
+  } = useQuery<ModelPerformanceMetrics[]>({
+    queryKey: ['model-performance'],
+    queryFn: () => apiClient.getModelPerformanceMetrics(),
+    refetchInterval: 60000, // Refetch every minute
   });
 
   const handleRefresh = async () => {
@@ -601,6 +756,63 @@ const SystemHealth: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Default: {ollamaHealth?.default_model || 'None'}
+                  </Typography>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={3}>
+          <Card elevation={0}>
+            <CardContent>
+              {httpLoading ? (
+                <CardSkeleton lines={3} />
+              ) : (
+                <>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      HTTP Client
+                    </Typography>
+                    <CheckCircle color={httpMetrics ? 'success' : 'warning'} />
+                  </Box>
+                  <Typography variant="h3" sx={{ fontWeight: 700, color: 'secondary.main', mb: 1 }}>
+                    {httpMetrics?.total_requests || 0}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Total Requests
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Success Rate: {httpMetrics ? ((httpMetrics.successful_requests / httpMetrics.total_requests) * 100).toFixed(1) : 0}%
+                  </Typography>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={3}>
+          <Card elevation={0}>
+            <CardContent>
+              {modelPerformanceLoading ? (
+                <CardSkeleton lines={3} />
+              ) : (
+                <>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      AI Models
+                    </Typography>
+                    <CheckCircle color={modelPerformance ? 'success' : 'warning'} />
+                  </Box>
+                  <Typography variant="h3" sx={{ fontWeight: 700, color: 'success.main', mb: 1 }}>
+                    {modelPerformance?.length || 0}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Models Tracked
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Avg Response: {modelPerformance?.length ?
+                      (modelPerformance.reduce((sum, m) => sum + m.average_response_time_ms, 0) / modelPerformance.length).toFixed(0) : 0}ms
                   </Typography>
                 </>
               )}

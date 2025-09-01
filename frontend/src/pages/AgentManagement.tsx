@@ -45,11 +45,28 @@ import {
   AutoAwesome,
   Send,
   Person,
+  ModelTraining,
+  Http,
+  VpnKey,
+  Analytics,
+  Memory,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/api';
-import type { Agent, OllamaModelNamesResponse, ChatSession, ChatMessage } from '../types';
+import type {
+  Agent,
+  OllamaModelNamesResponse,
+  ChatSession,
+  ChatMessage,
+  AvailableModel,
+  ModelPerformanceMetrics,
+  HttpClientMetrics,
+  ProcessedContent,
+  ContentProcessingRequest,
+  AgentSecret,
+  AgentSecretsResponse
+} from '../types';
 
 interface CreateAgentForm {
   name: string;
@@ -71,6 +88,15 @@ const AgentManagement: React.FC = () => {
   const [wizardInput, setWizardInput] = useState('');
   const [isWizardTyping, setIsWizardTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // New state for enhanced features
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showContentProcessor, setShowContentProcessor] = useState(false);
+  const [showSecretsManager, setShowSecretsManager] = useState(false);
+  const [contentToProcess, setContentToProcess] = useState('');
+  const [processingResults, setProcessingResults] = useState<ProcessedContent | null>(null);
+  const [newSecret, setNewSecret] = useState({ key: '', value: '', description: '' });
 
   const [formData, setFormData] = useState<CreateAgentForm>({
     name: '',
@@ -101,6 +127,47 @@ const AgentManagement: React.FC = () => {
     queryKey: ['ollama-models'],
     queryFn: () => apiClient.getOllamaModelNames(),
     refetchInterval: 60000, // Refetch every minute
+  });
+
+  // Fetch available models with capabilities (Phase 1.3)
+  const {
+    data: availableModelsWithCapabilities,
+    isLoading: capabilitiesLoading,
+  } = useQuery({
+    queryKey: ['available-models'],
+    queryFn: () => apiClient.getAvailableModels(),
+    refetchInterval: 300000, // Refetch every 5 minutes
+  });
+
+  // Fetch model performance metrics
+  const {
+    data: modelPerformance,
+    isLoading: performanceLoading,
+  } = useQuery({
+    queryKey: ['model-performance'],
+    queryFn: () => apiClient.getModelPerformanceMetrics(),
+    refetchInterval: 60000, // Refetch every minute
+  });
+
+  // Fetch HTTP client metrics
+  const {
+    data: httpMetrics,
+    isLoading: httpLoading,
+  } = useQuery({
+    queryKey: ['http-metrics'],
+    queryFn: () => apiClient.getHttpClientMetrics(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Fetch agent secrets
+  const {
+    data: agentSecrets,
+    isLoading: secretsLoading,
+    refetch: refetchSecrets,
+  } = useQuery<AgentSecretsResponse>({
+    queryKey: ['agent-secrets', selectedAgent?.id],
+    queryFn: () => selectedAgent ? apiClient.getAgentSecrets(selectedAgent.id) : Promise.resolve({ secrets: [], total_count: 0 }),
+    enabled: !!selectedAgent && showSecretsManager,
   });
 
   // Create agent mutation
@@ -166,6 +233,42 @@ const AgentManagement: React.FC = () => {
     },
     onError: () => {
       setIsWizardTyping(false);
+    },
+  });
+
+  // New mutations for enhanced features
+  const selectModelMutation = useMutation({
+    mutationFn: (selectionData: {
+      task_type: string;
+      content_type: string;
+      priority?: string;
+      max_tokens?: number;
+      requirements?: any;
+    }) => apiClient.selectOptimalModel(selectionData),
+  });
+
+  const processContentMutation = useMutation({
+    mutationFn: (contentData: ContentProcessingRequest) =>
+      apiClient.processContent(contentData),
+    onSuccess: (result) => {
+      setProcessingResults(result);
+    },
+  });
+
+  const createSecretMutation = useMutation({
+    mutationFn: (secretData: { secret_key: string; secret_value: string; description?: string }) =>
+      selectedAgent ? apiClient.createAgentSecret(selectedAgent.id, secretData) : Promise.reject('No agent selected'),
+    onSuccess: () => {
+      refetchSecrets();
+      setNewSecret({ key: '', value: '', description: '' });
+    },
+  });
+
+  const deleteSecretMutation = useMutation({
+    mutationFn: (secretId: string) =>
+      selectedAgent ? apiClient.deleteAgentSecret(selectedAgent.id, secretId) : Promise.reject('No agent selected'),
+    onSuccess: () => {
+      refetchSecrets();
     },
   });
 
@@ -257,6 +360,52 @@ const AgentManagement: React.FC = () => {
     setWizardInput('');
   };
 
+  // New handler functions for enhanced features
+  const handleOpenModelSelector = (agent: Agent) => {
+    setSelectedAgent(agent);
+    setShowModelSelector(true);
+  };
+
+  const handleOpenContentProcessor = (agent: Agent) => {
+    setSelectedAgent(agent);
+    setShowContentProcessor(true);
+  };
+
+  const handleOpenSecretsManager = (agent: Agent) => {
+    setSelectedAgent(agent);
+    setShowSecretsManager(true);
+  };
+
+  const handleSelectModel = (selectionData: any) => {
+    selectModelMutation.mutate(selectionData);
+  };
+
+  const handleProcessContent = () => {
+    if (!contentToProcess.trim()) return;
+
+    processContentMutation.mutate({
+      content: contentToProcess,
+      content_type: 'text',
+      operations: ['summarize', 'extract_entities'],
+    });
+  };
+
+  const handleCreateSecret = () => {
+    if (!newSecret.key.trim() || !newSecret.value.trim()) return;
+
+    createSecretMutation.mutate({
+      secret_key: newSecret.key,
+      secret_value: newSecret.value,
+      description: newSecret.description,
+    });
+  };
+
+  const handleDeleteSecret = (secretId: string) => {
+    if (window.confirm('Are you sure you want to delete this secret?')) {
+      deleteSecretMutation.mutate(secretId);
+    }
+  };
+
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -302,7 +451,7 @@ const AgentManagement: React.FC = () => {
             Create, configure, and manage your AI agents dynamically.
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
             startIcon={<Refresh />}
@@ -310,6 +459,22 @@ const AgentManagement: React.FC = () => {
             disabled={isLoading}
           >
             Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ModelTraining />}
+            onClick={() => setShowModelSelector(true)}
+            disabled={!availableModelsWithCapabilities}
+          >
+            Model Performance
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Http />}
+            onClick={() => {/* TODO: Show HTTP metrics */}}
+            disabled={!httpMetrics}
+          >
+            HTTP Metrics
           </Button>
           <Button
             variant="outlined"
@@ -490,6 +655,30 @@ const AgentManagement: React.FC = () => {
                               disabled={!agent.is_active}
                             >
                               <PlayArrow />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Model Selection">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenModelSelector(agent)}
+                            >
+                              <ModelTraining />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Content Processing">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenContentProcessor(agent)}
+                            >
+                              <Memory />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Secrets Manager">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenSecretsManager(agent)}
+                            >
+                              <VpnKey />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Edit Agent">
@@ -931,6 +1120,248 @@ const AgentManagement: React.FC = () => {
               Finalize Agent
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Model Performance Dialog */}
+      <Dialog
+        open={showModelSelector}
+        onClose={() => setShowModelSelector(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <ModelTraining sx={{ color: 'primary.main' }} />
+            <Typography variant="h6">Model Performance & Selection</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {capabilitiesLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <Skeleton variant="rectangular" width="100%" height={400} />
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Available Models</Typography>
+                <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                  {availableModelsWithCapabilities?.map((model) => (
+                    <Card key={model.name} sx={{ mb: 1 }}>
+                      <CardContent sx={{ py: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {model.name}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                          {model.capabilities.map((cap) => (
+                            <Chip key={cap} label={cap} size="small" variant="outlined" />
+                          ))}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          Performance Score: {model.performance_score.toFixed(2)}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Performance Metrics</Typography>
+                <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                  {modelPerformance?.map((metric) => (
+                    <Card key={`${metric.model_name}-${metric.task_type}`} sx={{ mb: 1 }}>
+                      <CardContent sx={{ py: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {metric.model_name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Task: {metric.task_type}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                          <Typography variant="body2">
+                            Success: {(metric.success_rate * 100).toFixed(1)}%
+                          </Typography>
+                          <Typography variant="body2">
+                            Avg Time: {metric.average_response_time_ms}ms
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowModelSelector(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Content Processor Dialog */}
+      <Dialog
+        open={showContentProcessor}
+        onClose={() => setShowContentProcessor(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Memory sx={{ color: 'primary.main' }} />
+            <Typography variant="h6">Content Processing</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="Content to Process"
+                value={contentToProcess}
+                onChange={(e) => setContentToProcess(e.target.value)}
+                placeholder="Enter text content to process..."
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleProcessContent}
+                  disabled={!contentToProcess.trim() || processContentMutation.isPending}
+                  startIcon={<Memory />}
+                >
+                  {processContentMutation.isPending ? 'Processing...' : 'Process Content'}
+                </Button>
+              </Box>
+            </Grid>
+            {processingResults && (
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Processing Results</Typography>
+                <Card>
+                  <CardContent>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {processingResults.processed_content?.summary || 'No summary available'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Processing time: {processingResults.processing_time_ms}ms
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowContentProcessor(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Secrets Manager Dialog */}
+      <Dialog
+        open={showSecretsManager}
+        onClose={() => setShowSecretsManager(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <VpnKey sx={{ color: 'primary.main' }} />
+            <Typography variant="h6">
+              Secrets Manager - {selectedAgent?.name}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2 }}>Add New Secret</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    label="Secret Key"
+                    value={newSecret.key}
+                    onChange={(e) => setNewSecret({ ...newSecret, key: e.target.value })}
+                    placeholder="e.g., api_key"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    label="Secret Value"
+                    type="password"
+                    value={newSecret.value}
+                    onChange={(e) => setNewSecret({ ...newSecret, value: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    label="Description (Optional)"
+                    value={newSecret.description}
+                    onChange={(e) => setNewSecret({ ...newSecret, description: e.target.value })}
+                  />
+                </Grid>
+              </Grid>
+              <Box sx={{ mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleCreateSecret}
+                  disabled={!newSecret.key.trim() || !newSecret.value.trim() || createSecretMutation.isPending}
+                  startIcon={<VpnKey />}
+                >
+                  {createSecretMutation.isPending ? 'Adding...' : 'Add Secret'}
+                </Button>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2 }}>Existing Secrets</Typography>
+              {secretsLoading ? (
+                <Skeleton variant="rectangular" width="100%" height={200} />
+              ) : (
+                <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                  {agentSecrets?.secrets?.map((secret) => (
+                    <Card key={secret.secret_id} sx={{ mb: 1 }}>
+                      <CardContent sx={{ py: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              {secret.secret_key}
+                            </Typography>
+                            {secret.description && (
+                              <Typography variant="body2" color="text.secondary">
+                                {secret.description}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="text.secondary">
+                              Created: {new Date(secret.created_at).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteSecret(secret.secret_id)}
+                            color="error"
+                          >
+                            <Delete />
+                          </IconButton>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  )) || (
+                    <Typography variant="body2" color="text.secondary">
+                      No secrets found for this agent.
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSecretsManager(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
