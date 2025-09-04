@@ -23,10 +23,27 @@ import Chat from './pages/Chat';
 import Utilities from './pages/Utilities';
 import Settings from './pages/Settings';
 import WorkflowTemplate from './pages/WorkflowTemplate';
+import ContentProcessing from './pages/ContentProcessing';
+import Analytics from './pages/Analytics';
+import Personalization from './pages/Personalization';
+import Trends from './pages/Trends';
+import SearchIntelligence from './pages/SearchIntelligence';
+import VisionStudio from './pages/VisionStudio';
+import AudioWorkstation from './pages/AudioWorkstation';
+import CrossModalFusion from './pages/CrossModalFusion';
+import LearningAdaptation from './pages/LearningAdaptation';
+import WorkflowStudio from './pages/WorkflowStudio';
+import IntegrationHub from './pages/IntegrationHub';
+import LoadBalancing from './pages/LoadBalancing';
+import Collaboration from './pages/Collaboration';
+import UserManagement from './pages/UserManagement';
 
 // Workflow modules
 import EmailAssistant from './modules/email-assistant/EmailAssistant';
 import DocumentAnalyzer from './modules/document-analyzer/DocumentAnalyzer';
+
+// Knowledge Base
+import KnowledgeBase from './pages/KnowledgeBase';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -93,6 +110,146 @@ const ThemedAppRoutes: React.FC = () => {
                 }
               />
               <Route
+                path="/content-processing"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <ContentProcessing />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Analytics />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/personalization"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Personalization />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/trends"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Trends />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/search-intelligence"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <SearchIntelligence />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/vision-studio"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <VisionStudio />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/audio-workstation"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <AudioWorkstation />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/cross-modal-fusion"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <CrossModalFusion />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/learning-adaptation"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <LearningAdaptation />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/workflow-studio"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <WorkflowStudio />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/integration-hub"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <IntegrationHub />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/load-balancing"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <LoadBalancing />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/collaboration"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <Collaboration />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/user-management"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <UserManagement />
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
                 path="/chat"
                 element={
                   <PrivateRoute>
@@ -136,6 +293,16 @@ const ThemedAppRoutes: React.FC = () => {
                       >
                         <WorkflowList />
                       </WorkflowTemplate>
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/workflows/knowledge-base"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                      <KnowledgeBase />
                     </Layout>
                   </PrivateRoute>
                 }

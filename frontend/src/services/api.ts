@@ -7,9 +7,14 @@ class ApiClient {
   private authToken: string | null = null;
 
   constructor() {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+    if (!apiBaseUrl) {
+      throw new Error('VITE_API_BASE_URL environment variable is not defined. Please check your .env file.');
+    }
+
     this.client = axios.create({
-      baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
-      timeout: 300000, // 5 minutes for local LLM inference (homelab environments)
+      baseURL: apiBaseUrl,
+      timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '300000'), // Configurable timeout with fallback
       headers: {
         'Content-Type': 'application/json',
       },
@@ -111,20 +116,16 @@ class ApiClient {
 
   // Authentication
   async login(username: string, password: string) {
-    const formData = new URLSearchParams();
-    formData.append('username', username);
-    formData.append('password', password);
-    
-    const response = await this.client.post('/api/v1/auth/login', formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+    // Use JSON login endpoint as recommended for frontend
+    const response = await this.client.post('/api/v1/auth/login-json', {
+      username,
+      password,
     });
-    
+
     if (response.data.access_token) {
       this.setAuthToken(response.data.access_token);
     }
-    
+
     return response.data;
   }
 
@@ -134,6 +135,41 @@ class ApiClient {
     } finally {
       this.clearAuthToken();
     }
+  }
+
+  async createUser(userData: {
+    username: string;
+    email: string;
+    password: string;
+    is_active?: boolean;
+    is_superuser?: boolean;
+  }) {
+    const response = await this.client.post('/api/v1/auth/users', userData);
+    return response.data;
+  }
+
+  async getUsers() {
+    const response = await this.client.get('/api/v1/auth/users');
+    return response.data;
+  }
+
+  async getUser(userId: string) {
+    const response = await this.client.get(`/api/v1/auth/users/${userId}`);
+    return response.data;
+  }
+
+  async updateUser(userId: string, userData: Partial<{
+    username: string;
+    email: string;
+    is_active: boolean;
+    is_superuser: boolean;
+  }>) {
+    const response = await this.client.put(`/api/v1/auth/users/${userId}`, userData);
+    return response.data;
+  }
+
+  async deleteUser(userId: string) {
+    await this.client.delete(`/api/v1/auth/users/${userId}`);
   }
 
   async changePassword(currentPassword: string, newPassword: string) {
@@ -1414,6 +1450,220 @@ class ApiClient {
 
   async getLoadBalancerHealth() {
     const response = await this.client.get('/api/v1/integration/load-balancer/health');
+    return response.data;
+  }
+
+  // ==========================================
+  // KNOWLEDGE BASE - ENHANCED API INTEGRATION
+  // ==========================================
+
+  // Core Knowledge Item Management
+  async createKnowledgeItem(itemData: {
+    title: string;
+    content: string;
+    category?: string;
+    tags?: string[];
+    metadata?: any;
+  }) {
+    const response = await this.client.post('/api/v1/knowledge/items', itemData);
+    return response.data;
+  }
+
+  async createTwitterBookmarkItem(bookmarkData: {
+    bookmark_url: string;
+    title: string;
+    summary?: string;
+    content?: string;
+    bookmarked_at?: string;
+    tags?: string[];
+    metadata?: any;
+  }) {
+    const response = await this.client.post('/api/v1/knowledge/items/twitter-bookmark', bookmarkData);
+    return response.data;
+  }
+
+  async getKnowledgeItems(params?: {
+    category?: string;
+    tags?: string[];
+    limit?: number;
+    offset?: number;
+  }) {
+    const response = await this.client.get('/api/v1/knowledge/items', { params });
+    return response.data;
+  }
+
+  async getKnowledgeItem(itemId: string) {
+    const response = await this.client.get(`/api/v1/knowledge/items/${itemId}`);
+    return response.data;
+  }
+
+  async getKnowledgeItemDetails(itemId: string) {
+    const response = await this.client.get(`/api/v1/knowledge/items/${itemId}/details`);
+    return response.data;
+  }
+
+  async updateKnowledgeItem(itemId: string, itemData: {
+    title?: string;
+    content?: string;
+    category?: string;
+    tags?: string[];
+    metadata?: any;
+  }) {
+    const response = await this.client.put(`/api/v1/knowledge/items/${itemId}/edit`, itemData);
+    return response.data;
+  }
+
+  async deleteKnowledgeItem(itemId: string) {
+    await this.client.delete(`/api/v1/knowledge/items/${itemId}`);
+  }
+
+  async reprocessKnowledgeItem(itemId: string, options?: {
+    phases?: string[];
+    workflow_settings_id?: string;
+    reason?: string;
+    start_immediately?: boolean;
+  }) {
+    const response = await this.client.post(`/api/v1/knowledge/items/${itemId}/reprocess`, options || {});
+    return response.data;
+  }
+
+  // Twitter Bookmarks Integration
+  async fetchTwitterBookmarks(fetchData: {
+    bookmark_url: string;
+    max_results?: number;
+    process_items?: boolean;
+    workflow_settings_id?: string;
+  }) {
+    const response = await this.client.post('/api/v1/knowledge/fetch-twitter-bookmarks', fetchData);
+    return response.data;
+  }
+
+  // Workflow Cancellation
+  async cancelKnowledgeItemProcessing(itemId: string) {
+    const response = await this.client.delete(`/api/v1/knowledge/items/${itemId}/cancel`);
+    return response.data;
+  }
+
+  // Workflow Settings Management
+  async getWorkflowSettings() {
+    const response = await this.client.get('/api/v1/knowledge/workflow-settings');
+    return response.data;
+  }
+
+  async createWorkflowSettings(settingsData: {
+    settings_name: string;
+    is_default?: boolean;
+    phase_models?: any;
+    phase_settings?: any;
+    global_settings?: any;
+  }) {
+    const response = await this.client.post('/api/v1/knowledge/workflow-settings', settingsData);
+    return response.data;
+  }
+
+  async getWorkflowSettingsById(settingsId: string) {
+    const response = await this.client.get(`/api/v1/knowledge/workflow-settings/${settingsId}`);
+    return response.data;
+  }
+
+  async updateWorkflowSettings(settingsId: string, settingsData: any) {
+    const response = await this.client.put(`/api/v1/knowledge/workflow-settings/${settingsId}`, settingsData);
+    return response.data;
+  }
+
+  async deleteWorkflowSettings(settingsId: string) {
+    await this.client.delete(`/api/v1/knowledge/workflow-settings/${settingsId}`);
+  }
+
+  async activateWorkflowSettings(settingsId: string) {
+    const response = await this.client.post(`/api/v1/knowledge/workflow-settings/${settingsId}/activate`);
+    return response.data;
+  }
+
+  async getWorkflowSettingsDefaults() {
+    const response = await this.client.get('/api/v1/knowledge/workflow-settings/defaults');
+    return response.data;
+  }
+
+  // Progress Monitoring
+  async getKnowledgeItemProgress(itemId: string) {
+    const response = await this.client.get(`/api/v1/knowledge/items/${itemId}/progress`);
+    return response.data;
+  }
+
+  async getBatchProgress(itemIds: string[]) {
+    const params = new URLSearchParams();
+    itemIds.forEach(id => params.append('item_ids', id));
+    const response = await this.client.get('/api/v1/knowledge/progress/batch', { params });
+    return response.data;
+  }
+
+  async getActiveProgress(limit?: number) {
+    const response = await this.client.get('/api/v1/knowledge/progress/active', {
+      params: limit ? { limit } : undefined
+    });
+    return response.data;
+  }
+
+  async getProgressSummary() {
+    const response = await this.client.get('/api/v1/knowledge/progress/summary');
+    return response.data;
+  }
+
+  // Advanced Browsing and Search
+  async browseKnowledgeBase(params?: {
+    category?: string;
+    subcategory?: string;
+    tags?: string[];
+    date_from?: string;
+    date_to?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) {
+    const response = await this.client.get('/api/v1/knowledge/browse', { params });
+    return response.data;
+  }
+
+  async searchKnowledgeBase(searchData: {
+    query: string;
+    category?: string;
+    tags?: string[];
+    limit?: number;
+    similarity_threshold?: number;
+    search_type?: 'semantic' | 'keyword' | 'hybrid';
+  }) {
+    const response = await this.client.post('/api/v1/knowledge/search', searchData);
+    return response.data;
+  }
+
+  async getKnowledgeCategories() {
+    const response = await this.client.get('/api/v1/knowledge/categories');
+    return response.data;
+  }
+
+  async getKnowledgeStats() {
+    const response = await this.client.get('/api/v1/knowledge/stats');
+    return response.data;
+  }
+
+  // AI Processing
+  async generateKnowledgeEmbeddings(embeddingData: {
+    content: string;
+    model?: string;
+    dimensions?: number;
+  }) {
+    const response = await this.client.post('/api/v1/knowledge/embeddings', embeddingData);
+    return response.data;
+  }
+
+  async classifyKnowledgeContent(classificationData: {
+    content: string;
+    categories?: string[];
+    confidence_threshold?: number;
+  }) {
+    const response = await this.client.post('/api/v1/knowledge/classify', classificationData);
     return response.data;
   }
 

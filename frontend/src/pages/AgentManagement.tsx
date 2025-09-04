@@ -48,7 +48,6 @@ import {
   ModelTraining,
   Http,
   VpnKey,
-  Analytics,
   Memory,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -59,12 +58,8 @@ import type {
   OllamaModelNamesResponse,
   ChatSession,
   ChatMessage,
-  AvailableModel,
-  ModelPerformanceMetrics,
-  HttpClientMetrics,
   ProcessedContent,
   ContentProcessingRequest,
-  AgentSecret,
   AgentSecretsResponse
 } from '../types';
 
@@ -94,9 +89,23 @@ const AgentManagement: React.FC = () => {
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showContentProcessor, setShowContentProcessor] = useState(false);
   const [showSecretsManager, setShowSecretsManager] = useState(false);
+  const [showHttpClient, setShowHttpClient] = useState(false);
   const [contentToProcess, setContentToProcess] = useState('');
   const [processingResults, setProcessingResults] = useState<ProcessedContent | null>(null);
   const [newSecret, setNewSecret] = useState({ key: '', value: '', description: '' });
+
+  // HTTP Client state
+  const [httpRequest, setHttpRequest] = useState({
+    method: 'GET',
+    url: '',
+    headers: [{ key: '', value: '' }],
+    data: '',
+    timeout: 30,
+    retry_config: { max_attempts: 3, backoff_factor: 2.0 },
+    rate_limit: { requests_per_minute: 60 }
+  });
+  const [httpResponse, setHttpResponse] = useState<any>(null);
+  const [httpMetrics, setHttpMetrics] = useState<any>(null);
 
   const [formData, setFormData] = useState<CreateAgentForm>({
     name: '',
@@ -142,21 +151,10 @@ const AgentManagement: React.FC = () => {
   // Fetch model performance metrics
   const {
     data: modelPerformance,
-    isLoading: performanceLoading,
   } = useQuery({
     queryKey: ['model-performance'],
     queryFn: () => apiClient.getModelPerformanceMetrics(),
     refetchInterval: 60000, // Refetch every minute
-  });
-
-  // Fetch HTTP client metrics
-  const {
-    data: httpMetrics,
-    isLoading: httpLoading,
-  } = useQuery({
-    queryKey: ['http-metrics'],
-    queryFn: () => apiClient.getHttpClientMetrics(),
-    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   // Fetch agent secrets
@@ -236,16 +234,6 @@ const AgentManagement: React.FC = () => {
     },
   });
 
-  // New mutations for enhanced features
-  const selectModelMutation = useMutation({
-    mutationFn: (selectionData: {
-      task_type: string;
-      content_type: string;
-      priority?: string;
-      max_tokens?: number;
-      requirements?: any;
-    }) => apiClient.selectOptimalModel(selectionData),
-  });
 
   const processContentMutation = useMutation({
     mutationFn: (contentData: ContentProcessingRequest) =>
@@ -269,6 +257,21 @@ const AgentManagement: React.FC = () => {
       selectedAgent ? apiClient.deleteAgentSecret(selectedAgent.id, secretId) : Promise.reject('No agent selected'),
     onSuccess: () => {
       refetchSecrets();
+    },
+  });
+
+  // HTTP Client mutations
+  const makeHttpRequestMutation = useMutation({
+    mutationFn: (requestData: any) => apiClient.makeAgenticHttpRequest(requestData),
+    onSuccess: (response) => {
+      setHttpResponse(response);
+    },
+  });
+
+  const getHttpMetricsMutation = useMutation({
+    mutationFn: () => apiClient.getHttpClientMetrics(),
+    onSuccess: (metrics) => {
+      setHttpMetrics(metrics);
     },
   });
 
@@ -376,9 +379,6 @@ const AgentManagement: React.FC = () => {
     setShowSecretsManager(true);
   };
 
-  const handleSelectModel = (selectionData: any) => {
-    selectModelMutation.mutate(selectionData);
-  };
 
   const handleProcessContent = () => {
     if (!contentToProcess.trim()) return;
@@ -404,6 +404,53 @@ const AgentManagement: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this secret?')) {
       deleteSecretMutation.mutate(secretId);
     }
+  };
+
+  // HTTP Client handlers
+  const handleOpenHttpClient = () => {
+    setShowHttpClient(true);
+    getHttpMetricsMutation.mutate();
+  };
+
+  const handleAddHttpHeader = () => {
+    setHttpRequest(prev => ({
+      ...prev,
+      headers: [...prev.headers, { key: '', value: '' }]
+    }));
+  };
+
+  const handleUpdateHttpHeader = (index: number, field: 'key' | 'value', value: string) => {
+    setHttpRequest(prev => ({
+      ...prev,
+      headers: prev.headers.map((header, i) =>
+        i === index ? { ...header, [field]: value } : header
+      )
+    }));
+  };
+
+  const handleRemoveHttpHeader = (index: number) => {
+    setHttpRequest(prev => ({
+      ...prev,
+      headers: prev.headers.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleMakeHttpRequest = () => {
+    const requestData = {
+      method: httpRequest.method,
+      url: httpRequest.url,
+      headers: Object.fromEntries(
+        httpRequest.headers
+          .filter(h => h.key.trim() && h.value.trim())
+          .map(h => [h.key, h.value])
+      ),
+      ...(httpRequest.data && { data: httpRequest.data }),
+      timeout: httpRequest.timeout,
+      retry_config: httpRequest.retry_config,
+      rate_limit: httpRequest.rate_limit
+    };
+
+    makeHttpRequestMutation.mutate(requestData);
   };
 
   // Scroll to bottom when new messages arrive
@@ -471,10 +518,9 @@ const AgentManagement: React.FC = () => {
           <Button
             variant="outlined"
             startIcon={<Http />}
-            onClick={() => {/* TODO: Show HTTP metrics */}}
-            disabled={!httpMetrics}
+            onClick={handleOpenHttpClient}
           >
-            HTTP Metrics
+            HTTP Client
           </Button>
           <Button
             variant="outlined"
@@ -1146,14 +1192,14 @@ const AgentManagement: React.FC = () => {
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" sx={{ mb: 2 }}>Available Models</Typography>
                 <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                  {availableModelsWithCapabilities?.map((model) => (
+                  {availableModelsWithCapabilities?.map((model: any) => (
                     <Card key={model.name} sx={{ mb: 1 }}>
                       <CardContent sx={{ py: 2 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                           {model.name}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                          {model.capabilities.map((cap) => (
+                          {model.capabilities.map((cap: string) => (
                             <Chip key={cap} label={cap} size="small" variant="outlined" />
                           ))}
                         </Box>
@@ -1168,7 +1214,7 @@ const AgentManagement: React.FC = () => {
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" sx={{ mb: 2 }}>Performance Metrics</Typography>
                 <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                  {modelPerformance?.map((metric) => (
+                  {modelPerformance?.map((metric: any) => (
                     <Card key={`${metric.model_name}-${metric.task_type}`} sx={{ mb: 1 }}>
                       <CardContent sx={{ py: 2 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
@@ -1362,6 +1408,256 @@ const AgentManagement: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowSecretsManager(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* HTTP Client Dialog */}
+      <Dialog
+        open={showHttpClient}
+        onClose={() => setShowHttpClient(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Http sx={{ color: 'primary.main' }} />
+            <Typography variant="h6">Agentic HTTP Client</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={3}>
+            {/* HTTP Metrics */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2 }}>HTTP Client Metrics</Typography>
+              {httpMetrics ? (
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card elevation={1}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {httpMetrics.total_requests || 0}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Requests
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card elevation={1}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {httpMetrics.successful_requests || 0}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Successful
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card elevation={1}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {((httpMetrics.successful_requests || 0) / (httpMetrics.total_requests || 1) * 100).toFixed(1)}%
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Success Rate
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card elevation={1}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {httpMetrics.average_response_time_ms || 0}ms
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Avg Response Time
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              ) : (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Loading metrics...
+                  </Typography>
+                </Box>
+              )}
+            </Grid>
+
+            {/* Request Builder */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2 }}>Request Builder</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Method</InputLabel>
+                    <Select
+                      value={httpRequest.method}
+                      label="Method"
+                      onChange={(e) => setHttpRequest(prev => ({ ...prev, method: e.target.value }))}
+                    >
+                      <MenuItem value="GET">GET</MenuItem>
+                      <MenuItem value="POST">POST</MenuItem>
+                      <MenuItem value="PUT">PUT</MenuItem>
+                      <MenuItem value="DELETE">DELETE</MenuItem>
+                      <MenuItem value="PATCH">PATCH</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="URL"
+                    value={httpRequest.url}
+                    onChange={(e) => setHttpRequest(prev => ({ ...prev, url: e.target.value }))}
+                    placeholder="https://api.example.com/endpoint"
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+
+            {/* Headers */}
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">Headers</Typography>
+                <Button
+                  size="small"
+                  onClick={handleAddHttpHeader}
+                  startIcon={<Add />}
+                >
+                  Add Header
+                </Button>
+              </Box>
+              {httpRequest.headers.map((header, index) => (
+                <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <TextField
+                    size="small"
+                    placeholder="Header name"
+                    value={header.key}
+                    onChange={(e) => handleUpdateHttpHeader(index, 'key', e.target.value)}
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    size="small"
+                    placeholder="Header value"
+                    value={header.value}
+                    onChange={(e) => handleUpdateHttpHeader(index, 'value', e.target.value)}
+                    sx={{ flex: 1 }}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRemoveHttpHeader(index)}
+                    color="error"
+                  >
+                    <Delete />
+                  </IconButton>
+                </Box>
+              ))}
+            </Grid>
+
+            {/* Request Body */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="Request Body (JSON)"
+                value={httpRequest.data}
+                onChange={(e) => setHttpRequest(prev => ({ ...prev, data: e.target.value }))}
+                placeholder='{"key": "value"}'
+              />
+            </Grid>
+
+            {/* Configuration */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2 }}>Configuration</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Timeout (seconds)"
+                    value={httpRequest.timeout}
+                    onChange={(e) => setHttpRequest(prev => ({ ...prev, timeout: parseInt(e.target.value) }))}
+                    inputProps={{ min: 1, max: 300 }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Rate Limit (req/min)"
+                    value={httpRequest.rate_limit.requests_per_minute}
+                    onChange={(e) => setHttpRequest(prev => ({
+                      ...prev,
+                      rate_limit: { ...prev.rate_limit, requests_per_minute: parseInt(e.target.value) }
+                    }))}
+                    inputProps={{ min: 1, max: 1000 }}
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+
+            {/* Send Request Button */}
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleMakeHttpRequest}
+                  disabled={!httpRequest.url.trim() || makeHttpRequestMutation.isPending}
+                  startIcon={<Send />}
+                  sx={{ minWidth: 150 }}
+                >
+                  {makeHttpRequestMutation.isPending ? 'Sending...' : 'Send Request'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => getHttpMetricsMutation.mutate()}
+                  disabled={getHttpMetricsMutation.isPending}
+                >
+                  Refresh Metrics
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Response */}
+            {httpResponse && (
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Response</Typography>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ mb: 2 }}>
+                      <Chip
+                        label={`Status: ${httpResponse.status_code}`}
+                        color={httpResponse.status_code < 400 ? 'success' : 'error'}
+                        sx={{ mr: 1 }}
+                      />
+                      <Chip
+                        label={`Time: ${httpResponse.response_time_ms}ms`}
+                        variant="outlined"
+                      />
+                    </Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Headers:</Typography>
+                    <Box sx={{ mb: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1, fontSize: '0.875rem' }}>
+                      <pre>{JSON.stringify(httpResponse.headers, null, 2)}</pre>
+                    </Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Body:</Typography>
+                    <Box sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1, fontSize: '0.875rem', maxHeight: 200, overflow: 'auto' }}>
+                      <pre>{typeof httpResponse.content === 'string' ? httpResponse.content : JSON.stringify(httpResponse.content, null, 2)}</pre>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowHttpClient(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

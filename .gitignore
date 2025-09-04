@@ -64,3 +64,6 @@ temp/
 test-*.html
 test-*.js
 *.backup
+
+#
+.env

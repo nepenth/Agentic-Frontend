@@ -31,6 +31,20 @@ import {
   Engineering,
   Security,
   Chat,
+  Memory,
+  Assessment,
+  Person,
+  Search,
+  TrendingUp,
+  Audiotrack,
+  Visibility,
+  Psychology,
+  Compare,
+  Api,
+  AccountTree,
+  Balance,
+  Group,
+  Star,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
 import { useSelector, useDispatch } from 'react-redux';
@@ -49,6 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
   const { sidebarOpen } = useSelector((state: RootState) => state.ui);
   
   const [workflowsOpen, setWorkflowsOpen] = React.useState(true);
+  const [futureEnhancementsOpen, setFutureEnhancementsOpen] = React.useState(false);
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -65,6 +80,10 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
 
   const handleWorkflowsToggle = () => {
     setWorkflowsOpen(!workflowsOpen);
+  };
+
+  const handleFutureEnhancementsToggle = () => {
+    setFutureEnhancementsOpen(!futureEnhancementsOpen);
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -100,9 +119,88 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
     },
     {
       type: 'item',
+      path: '/content-processing',
+      label: 'Content Processing',
+      icon: <Memory />,
+    },
+    {
+      type: 'item',
+      path: '/workflow-studio',
+      label: 'Workflow Studio',
+      icon: <AccountTree />,
+    },
+    {
+      type: 'item',
       path: '/chat',
       label: 'AI Chat',
       icon: <Chat />,
+    },
+    {
+      type: 'divider',
+    },
+    {
+      type: 'parent',
+      label: 'Future Enhancements',
+      icon: <Star />,
+      open: futureEnhancementsOpen,
+      onToggle: handleFutureEnhancementsToggle,
+      children: [
+        {
+          path: '/analytics',
+          label: 'Analytics',
+          icon: <Assessment />,
+        },
+        {
+          path: '/personalization',
+          label: 'Personalization',
+          icon: <Person />,
+        },
+        {
+          path: '/trends',
+          label: 'Trends & Forecasting',
+          icon: <TrendingUp />,
+        },
+        {
+          path: '/search-intelligence',
+          label: 'Search Intelligence',
+          icon: <Search />,
+        },
+        {
+          path: '/vision-studio',
+          label: 'Vision AI Studio',
+          icon: <Visibility />,
+        },
+        {
+          path: '/audio-workstation',
+          label: 'Audio AI Workstation',
+          icon: <Audiotrack />,
+        },
+        {
+          path: '/cross-modal-fusion',
+          label: 'Cross-Modal Fusion',
+          icon: <Compare />,
+        },
+        {
+          path: '/learning-adaptation',
+          label: 'Learning & Adaptation',
+          icon: <Psychology />,
+        },
+        {
+          path: '/integration-hub',
+          label: 'Integration Hub',
+          icon: <Api />,
+        },
+        {
+          path: '/load-balancing',
+          label: 'Load Balancing',
+          icon: <Balance />,
+        },
+        {
+          path: '/collaboration',
+          label: 'Collaboration',
+          icon: <Group />,
+        },
+      ],
     },
     {
       type: 'divider',
@@ -114,6 +212,11 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
       open: workflowsOpen,
       onToggle: handleWorkflowsToggle,
       children: [
+        {
+          path: '/workflows/knowledge-base',
+          label: 'Knowledge Base',
+          icon: <Psychology />,
+        },
         {
           path: '/workflows/email-assistant',
           label: 'Email Assistant',
@@ -143,6 +246,12 @@ const Sidebar: React.FC<SidebarProps> = ({ drawerWidth = 280 }) => {
       label: 'Settings',
       icon: <Settings />,
     },
+    ...(user?.is_superuser ? [{
+      type: 'item' as const,
+      path: '/user-management',
+      label: 'User Management',
+      icon: <Person />,
+    }] : []),
   ];
 
   const drawer = (
