@@ -3,6 +3,7 @@ export interface User {
   username: string;
   email?: string;
   isAuthenticated: boolean;
+  is_superuser?: boolean;
 }
 
 export interface Agent {

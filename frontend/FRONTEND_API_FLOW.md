@@ -185,6 +185,16 @@ gpus: Array.isArray(gpuMetrics) ? gpuMetrics.map((gpu: any) => ({
 - `updateAgent()` - Modify existing agent configuration
 - `deleteAgent()` - Remove agents from system
 
+**Enhanced Features APIs:**
+- `getAvailableModels()` - Get models with capabilities for dynamic selection
+- `getModelPerformanceMetrics()` - Model performance data for comparison
+- `makeAgenticHttpRequest()` - Execute HTTP requests with agentic features
+- `getHttpClientMetrics()` - HTTP client performance and usage metrics
+- `processContent()` - Multi-modal content processing
+- `getAgentSecrets()` - Retrieve agent secrets for configuration
+- `createAgentSecret()` - Add new secrets to agents
+- `deleteAgentSecret()` - Remove agent secrets
+
 **CRUD Operations:**
 ```typescript
 // Create
@@ -237,6 +247,520 @@ const {
 ```
 
 **Real-time Updates:** None currently implemented
+
+### Content Processing Hub (`frontend/src/pages/ContentProcessing.tsx`)
+
+**Primary APIs:**
+- `discoverContent()` - Discover content from multiple sources simultaneously
+- `discoverWebContent()` - Discover content from web sources (RSS, scraping)
+- `discoverSocialContent()` - Discover content from social media platforms
+- `discoverCommunicationContent()` - Discover content from communication channels
+- `discoverFilesystemContent()` - Discover content from file systems and cloud storage
+- `processContent()` - Process discovered content with AI operations
+- `getContentCacheStats()` - Get content cache statistics and performance metrics
+
+**Content Discovery Workflow:**
+```typescript
+// Multi-source content discovery
+const discoverContentMutation = useMutation({
+  mutationFn: (request: ContentDiscoveryRequest) => apiClient.discoverContent(request),
+  onSuccess: (results) => {
+    // Handle discovered content from multiple sources
+    console.log('Discovered content:', results);
+  },
+});
+
+// Source-specific discovery
+const webDiscoveryMutation = useMutation({
+  mutationFn: (config: WebContentConfig) => apiClient.discoverWebContent(config),
+  onSuccess: (results) => {
+    // Handle web content discovery results
+  },
+});
+```
+
+**Content Processing Pipeline:**
+```typescript
+// Process content with multiple operations
+const processContentMutation = useMutation({
+  mutationFn: (request: ContentProcessingRequest) => apiClient.processContent(request),
+  onSuccess: (result) => {
+    setProcessingResults(result);
+    // Display processing results with summary, entities, and metadata
+  },
+});
+
+// Cache management
+const cacheStatsQuery = useQuery({
+  queryKey: ['content-cache-stats'],
+  queryFn: () => apiClient.getContentCacheStats(),
+  refetchInterval: 30000, // Real-time cache monitoring
+});
+```
+
+**Usage Pattern:**
+- **Source Configuration**: Interactive forms for configuring different content sources (RSS feeds, social media, file systems)
+- **Discovery Management**: Real-time progress tracking for content discovery operations
+- **Processing Pipeline**: Visual pipeline builder with drag-and-drop operations and result visualization
+- **Cache Monitoring**: Live cache statistics with performance metrics and optimization suggestions
+- **Multi-Modal Support**: Support for text, image, audio, and structured data processing
+
+**Real-time Updates:** Cache statistics updated every 30 seconds
+
+### Analytics Command Center (`frontend/src/pages/Analytics.tsx`)
+
+**Primary APIs:**
+- `getAnalyticsDashboard()` - Get comprehensive analytics dashboard with metrics and KPIs
+- `getContentInsights()` - Get AI-powered content performance insights and recommendations
+- `analyzeTrends()` - Perform advanced trend analysis with predictive capabilities
+- `getAnalyticsHealth()` - Get system health status and monitoring data
+- `exportAnalyticsReport()` - Export analytics data in various formats (PDF, CSV, JSON, XLSX)
+
+**Dashboard Data Flow:**
+```typescript
+// Comprehensive analytics dashboard
+const dashboardQuery = useQuery({
+  queryKey: ['analytics-dashboard', timePeriodDays, selectedMetrics],
+  queryFn: () => apiClient.getAnalyticsDashboard({
+    time_period_days: timePeriodDays,
+    metrics: selectedMetrics,
+  }),
+  refetchInterval: 300000, // Auto-refresh every 5 minutes
+});
+
+// Content insights with AI recommendations
+const insightsQuery = useQuery({
+  queryKey: ['content-insights', timePeriodDays],
+  queryFn: () => apiClient.getContentInsights(undefined, {
+    time_period_days: timePeriodDays,
+  }),
+  refetchInterval: 300000,
+});
+
+// Trend analysis with predictive insights
+const trendsQuery = useQuery({
+  queryKey: ['trend-analysis', timePeriodDays],
+  queryFn: () => apiClient.analyzeTrends({
+    time_period_days: timePeriodDays,
+    metrics: selectedMetrics,
+    trend_types: ['emerging', 'declining', 'seasonal'],
+  }),
+  refetchInterval: 300000,
+});
+
+// System health monitoring
+const healthQuery = useQuery({
+  queryKey: ['analytics-health'],
+  queryFn: () => apiClient.getAnalyticsHealth(),
+  refetchInterval: 60000, // Health check every minute
+});
+```
+
+**Export Functionality:**
+```typescript
+// Export analytics reports
+const exportMutation = useMutation({
+  mutationFn: (exportParams: any) => apiClient.exportAnalyticsReport(exportParams),
+  onSuccess: (data) => {
+    // Handle file download with automatic blob creation
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `analytics-report.${exportFormat}`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+});
+```
+
+**Usage Pattern:**
+- **Real-time Monitoring**: Dashboard auto-refreshes every 5 minutes with latest metrics
+- **Health Monitoring**: System health checked every minute with status indicators
+- **Interactive Filtering**: Time period selection, metric filtering, and date range controls
+- **Export Capabilities**: Multiple format support (PDF, CSV, JSON, XLSX) with customizable content
+- **Tab-based Navigation**: Organized views for Dashboard, Trends, Insights, and Performance
+- **Responsive Design**: Mobile-friendly layout with collapsible controls
+
+**Real-time Updates:** Dashboard data refreshes every 5 minutes, health status every minute
+
+### Personalization Studio (`frontend/src/pages/Personalization.tsx`)
+
+**Primary APIs:**
+- `getPersonalizedRecommendations()` - Get AI-powered personalized content recommendations
+- `getUserInsights()` - Get detailed user insights and behavioral analysis
+- `trackInteraction()` - Track user interactions for learning and personalization
+- `resetUserProfile()` - Reset user profile and personalization data
+- `getPersonalizationStats()` - Get personalization system statistics and metrics
+
+**Personalization Data Flow:**
+```typescript
+// Get personalized recommendations for a user
+const recommendationsQuery = useQuery({
+  queryKey: ['personalization-recommendations', userId, limit],
+  queryFn: () => apiClient.getPersonalizedRecommendations({
+    user_id: userId,
+    limit: limit,
+    diversity_weight: diversityWeight,
+  }),
+  enabled: !!userId,
+  refetchInterval: 300000, // Auto-refresh every 5 minutes
+});
+
+// Get detailed user insights and behavior analysis
+const insightsQuery = useQuery({
+  queryKey: ['user-insights', userId],
+  queryFn: () => apiClient.getUserInsights(userId),
+  enabled: !!userId,
+  refetchInterval: 300000,
+});
+
+// Track user interactions for continuous learning
+const trackInteractionMutation = useMutation({
+  mutationFn: (interaction: InteractionData) => apiClient.trackInteraction(interaction),
+  onSuccess: () => {
+    // Invalidate and refetch recommendations and insights
+    queryClient.invalidateQueries({ queryKey: ['personalization-recommendations'] });
+    queryClient.invalidateQueries({ queryKey: ['user-insights'] });
+  },
+});
+
+// Reset user profile for fresh personalization
+const resetProfileMutation = useMutation({
+  mutationFn: (userId: string) => apiClient.resetUserProfile(userId),
+  onSuccess: () => {
+    // Clear cached data and refetch
+    queryClient.invalidateQueries({ queryKey: ['personalization-recommendations'] });
+    queryClient.invalidateQueries({ queryKey: ['user-insights'] });
+  },
+});
+```
+
+**Recommendation Engine:**
+```typescript
+// Interactive recommendation feedback
+const handleRecommendationFeedback = (contentId: string, feedback: 'like' | 'dislike') => {
+  trackInteractionMutation.mutate({
+    user_id: selectedUserId,
+    content_id: contentId,
+    interaction_type: feedback,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      source: 'personalization_studio',
+      context: 'recommendation_feedback'
+    }
+  });
+};
+```
+
+**Usage Pattern:**
+- **User Selection**: Enter user ID to load personalized content and insights
+- **Real-time Recommendations**: AI-powered recommendations with scoring and reasoning
+- **Interactive Feedback**: Like/dislike buttons to improve personalization
+- **Profile Management**: Reset user profiles for fresh personalization
+- **Behavioral Insights**: Detailed analysis of user behavior patterns and preferences
+- **Settings Configuration**: Adjustable personalization parameters (diversity, limits)
+- **Performance Monitoring**: Real-time stats on personalization effectiveness
+
+**Real-time Updates:** Recommendations and insights refresh every 5 minutes, stats every minute
+
+### Trend Detection & Forecasting (`frontend/src/pages/Trends.tsx`)
+
+**Primary APIs:**
+- `analyzeTrends()` - Advanced trend analysis with multi-metric support
+- `getTrendAlerts()` - Get configured trend alerts and notifications
+- `configureTrendAlerts()` - Configure alerts for trend changes and anomalies
+
+---
+
+## Phase 5: Orchestration & Automation
+
+### Workflow Orchestration Studio (`frontend/src/pages/WorkflowStudio.tsx`)
+
+**Primary APIs:**
+- `getWorkflowDefinitions()` - List all workflow definitions with filtering
+- `getWorkflowExecutions()` - Get execution history for workflows
+- `createWorkflowDefinition()` - Create new workflow with steps and triggers
+- `executeWorkflow()` - Execute workflow with real-time monitoring
+- `getWorkflowStats()` - Get workflow performance statistics
+
+**WebSocket Connections:**
+- `/ws/workflows` - Real-time workflow status updates
+- **Message Types:** `workflow_status`, `workflow_progress`, `workflow_complete`, `workflow_failed`
+- **Features:** Live execution monitoring, automatic UI updates, status notifications
+
+**Usage Pattern:**
+```typescript
+// Real-time workflow monitoring
+const workflowSubscription = webSocketService.subscribeToWorkflowUpdates(
+  (update) => {
+    console.log('Workflow update:', update);
+    // Auto-refresh UI with latest status
+    refetchExecutions();
+  },
+  { workflow_id: selectedWorkflow?.id }
+);
+```
+
+### Integration Control Center (`frontend/src/pages/IntegrationHub.tsx`)
+
+**Primary APIs:**
+- `getApiGatewayStats()` - API gateway performance and route metrics
+- `getWebhooks()` - List webhook subscriptions with delivery metrics
+- `getQueues()` - Queue status and pending items
+- `getBackendServices()` - Backend service health and metrics
+- `subscribeWebhook()` - Create webhook subscriptions
+- `registerBackendService()` - Register new backend services
+
+**WebSocket Connections:**
+- `/ws/integration` - Real-time integration events
+- **Message Types:** `integration_event`, `webhook_delivery`, `queue_update`, `backend_health`
+- **Features:** Live webhook delivery tracking, queue monitoring, backend health alerts
+
+**Usage Pattern:**
+```typescript
+// Real-time integration monitoring
+const integrationSubscription = webSocketService.subscribeToIntegrationEvents(
+  (event) => {
+    if (event.type === 'webhook_delivery') {
+      // Update webhook delivery metrics
+      refetchWebhooks();
+    }
+  }
+);
+```
+
+### Load Balancing Dashboard (`frontend/src/pages/LoadBalancing.tsx`)
+
+**Primary APIs:**
+- `getLoadBalancerStats()` - Overall load balancing metrics
+- `getBackendServices()` - Backend service status and load factors
+- `registerBackendService()` - Register backend services for load balancing
+- `getLoadBalancerHealth()` - Load balancer health status
+
+**WebSocket Connections:**
+- `/ws/load-balancing` - Real-time load balancing metrics
+- **Message Types:** `backend_metrics`, `load_distribution`, `health_check`
+- **Features:** Live backend monitoring, load distribution updates, health check alerts
+
+**Usage Pattern:**
+```typescript
+// Real-time load balancing monitoring
+const loadBalancingSubscription = webSocketService.subscribeToLoadBalancingMetrics(
+  (metrics) => {
+    if (metrics.type === 'backend_metrics') {
+      // Update backend service metrics
+      refetchBackends();
+    }
+  }
+);
+```
+
+### Phase 5 WebSocket Architecture
+
+**Connection Management:**
+- **Authentication:** JWT token-based authentication for all Phase 5 WebSocket connections
+- **Heartbeat:** 30-second ping/pong with 90-second timeout (backend specification)
+- **Rate Limiting:** 100 messages/minute per connection with client-side enforcement
+- **Auto-Reconnection:** Exponential backoff with max 5 retry attempts
+
+**Message Format:**
+```json
+{
+  "type": "workflow_status|integration_event|backend_metrics",
+  "data": {
+    "timestamp": "2024-01-01T12:00:00Z",
+    "workflow_id|event_type|backend_id": "identifier",
+    "status|details|metrics": "payload"
+  }
+}
+```
+
+**Real-time Features:**
+- ✅ **Workflow Execution Monitoring:** Live status updates during workflow execution
+- ✅ **Integration Event Streaming:** Real-time webhook deliveries and queue updates
+- ✅ **Load Balancing Metrics:** Live backend health and performance monitoring
+- ✅ **Automatic UI Updates:** Components refresh automatically on WebSocket events
+- ✅ **Connection Resilience:** Robust reconnection and error handling
+
+**Trend Analysis Data Flow:**
+```typescript
+// Comprehensive trend analysis across multiple metrics
+const trendAnalysisQuery = useQuery({
+  queryKey: ['trend-analysis', timePeriodDays, selectedMetrics],
+  queryFn: () => apiClient.analyzeTrends({
+    time_period_days: timePeriodDays,
+    metrics: selectedMetrics,
+    trend_types: ['emerging', 'declining', 'seasonal'],
+  }),
+  refetchInterval: autoRefresh ? 300000 : false, // Auto-refresh every 5 minutes
+});
+
+// Forecasting with configurable horizon
+const forecastingQuery = useQuery({
+  queryKey: ['forecasting', timePeriodDays, forecastHorizon, selectedMetrics],
+  queryFn: () => apiClient.analyzeTrends({
+    time_period_days: timePeriodDays,
+    metrics: selectedMetrics,
+    trend_types: ['emerging', 'declining', 'seasonal'],
+  }),
+  refetchInterval: autoRefresh ? 300000 : false,
+});
+
+// Anomaly detection with configurable sensitivity
+const anomalyQuery = useQuery({
+  queryKey: ['anomaly-detection', timePeriodDays, anomalyThreshold, selectedMetrics],
+  queryFn: () => apiClient.analyzeTrends({
+    time_period_days: timePeriodDays,
+    metrics: selectedMetrics,
+    trend_types: ['emerging', 'declining', 'seasonal'],
+  }),
+  refetchInterval: autoRefresh ? 300000 : false,
+});
+```
+
+**Alert Configuration:**
+```typescript
+// Configure alerts for trend changes
+const alertConfigMutation = useMutation({
+  mutationFn: (config: any) => Promise.resolve(config), // Placeholder for actual API
+  onSuccess: () => {
+    // Handle alert configuration success
+    console.log('Alert configured successfully');
+  },
+});
+
+// Interactive alert setup
+const handleConfigureAlert = (metric: string, threshold: number, trendType: string) => {
+  alertConfigMutation.mutate({
+    metric,
+    threshold,
+    trend_type: trendType,
+    notification_channels: ['email', 'dashboard'],
+    enabled: true,
+  });
+};
+```
+
+**Usage Pattern:**
+- **Multi-Metric Analysis**: Analyze trends across usage, performance, content, and user metrics simultaneously
+- **Interactive Forecasting**: Configure forecast horizon and view predictive insights
+- **Anomaly Detection**: Real-time anomaly detection with configurable sensitivity thresholds
+- **Alert Management**: Set up alerts for significant trend changes and anomalies
+- **Auto-Refresh**: Optional auto-refresh every 5 minutes for real-time monitoring
+- **Settings Configuration**: Adjustable parameters for trend detection sensitivity and forecasting accuracy
+
+**Real-time Updates:** Trend analysis refreshes every 5 minutes when auto-refresh is enabled
+
+### Search Intelligence Hub (`frontend/src/pages/SearchIntelligence.tsx`)
+
+**Primary APIs:**
+- `getAnalyticsDashboard()` - Get comprehensive search analytics and metrics
+- `getContentInsights()` - Get search insights and optimization recommendations
+- `trackInteraction()` - Track search events and user interactions
+
+**Search Analytics Data Flow:**
+```typescript
+// Comprehensive search analytics dashboard
+const searchAnalyticsQuery = useQuery({
+  queryKey: ['search-analytics', timePeriodDays],
+  queryFn: () => apiClient.getAnalyticsDashboard({
+    time_period_days: timePeriodDays,
+    metrics: ['search'],
+  }),
+  refetchInterval: autoRefresh ? 300000 : false, // Auto-refresh every 5 minutes
+});
+
+// Query-specific performance analysis
+const queryPerformanceQuery = useQuery({
+  queryKey: ['query-performance', searchQuery, timePeriodDays],
+  queryFn: () => apiClient.getAnalyticsDashboard({
+    time_period_days: timePeriodDays,
+    metrics: ['search'],
+  }),
+  enabled: !!searchQuery,
+  refetchInterval: autoRefresh ? 300000 : false,
+});
+
+// Search insights and optimization recommendations
+const searchInsightsQuery = useQuery({
+  queryKey: ['search-insights', timePeriodDays],
+  queryFn: () => apiClient.getContentInsights(undefined, {
+    time_period_days: timePeriodDays,
+  }),
+  refetchInterval: autoRefresh ? 300000 : false,
+});
+```
+
+**Search Event Tracking:**
+```typescript
+// Track search events for analytics
+const trackSearchMutation = useMutation({
+  mutationFn: (searchEvent: any) => Promise.resolve(searchEvent), // Placeholder for actual API
+  onSuccess: () => {
+    // Invalidate and refetch analytics data
+    queryClient.invalidateQueries({ queryKey: ['search-analytics'] });
+    queryClient.invalidateQueries({ queryKey: ['query-performance'] });
+  },
+});
+
+// Interactive search event tracking
+const handleTrackSearch = (query: string, resultsCount: number, responseTime: number) => {
+  trackSearchMutation.mutate({
+    query,
+    results_count: resultsCount,
+    response_time_ms: responseTime,
+    timestamp: new Date().toISOString(),
+    user_id: 'current-user', // Would come from auth context
+  });
+};
+```
+
+**Usage Pattern:**
+- **Query Analysis**: Enter specific search queries to analyze performance metrics
+- **Real-time Monitoring**: Auto-refresh search analytics every 5 minutes
+- **Performance Insights**: Detailed analysis of search success rates and response times
+- **Optimization Recommendations**: AI-powered suggestions for search improvement
+- **Interactive Feedback**: Track search events and user interactions
+- **Multi-tab Interface**: Organized views for Analytics, Performance, Insights, and Trends
+
+**Real-time Updates:** Search analytics refreshes every 5 minutes when auto-refresh is enabled
+
+**HTTP Client Integration:**
+```typescript
+// HTTP Request Builder State
+const [httpRequest, setHttpRequest] = useState({
+  method: 'GET',
+  url: '',
+  headers: [{ key: '', value: '' }],
+  data: '',
+  timeout: 30,
+  retry_config: { max_attempts: 3, backoff_factor: 2.0 },
+  rate_limit: { requests_per_minute: 60 }
+});
+
+// Make Agentic HTTP Request
+const makeHttpRequestMutation = useMutation({
+  mutationFn: (requestData: any) => apiClient.makeAgenticHttpRequest(requestData),
+  onSuccess: (response) => {
+    setHttpResponse(response);
+  },
+});
+
+// Get HTTP Client Metrics
+const getHttpMetricsMutation = useMutation({
+  mutationFn: () => apiClient.getHttpClientMetrics(),
+  onSuccess: (metrics) => {
+    setHttpMetrics(metrics);
+  },
+});
+```
+
+**Usage Pattern:**
+- **Request Builder**: Interactive form for configuring HTTP requests with headers, body, timeout, and retry settings
+- **Metrics Dashboard**: Real-time display of HTTP client performance (success rate, response times, request counts)
+- **Response Viewer**: Formatted display of HTTP responses with status codes, headers, and body content
+- **Rate Limiting**: Built-in rate limit controls and monitoring
 
 ### Real-Time Logs Viewer (`frontend/src/components/LogsViewer.tsx`)
 

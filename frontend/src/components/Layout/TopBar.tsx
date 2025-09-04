@@ -19,12 +19,14 @@ import {
   Logout,
   DarkMode,
   LightMode,
+  Lock,
 } from '@mui/icons-material';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { toggleSidebar, setTheme } from '../../store/slices/uiSlice';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
+import ChangePasswordDialog from '../ChangePasswordDialog';
 
 interface TopBarProps {
   drawerWidth?: number;
@@ -39,6 +41,7 @@ const TopBar: React.FC<TopBarProps> = ({ drawerWidth = 280 }) => {
   
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [notificationAnchorEl, setNotificationAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
 
   const handleToggleSidebar = () => {
     dispatch(toggleSidebar());
@@ -75,6 +78,11 @@ const TopBar: React.FC<TopBarProps> = ({ drawerWidth = 280 }) => {
     navigate('/settings');
   };
 
+  const handleChangePassword = () => {
+    handleProfileMenuClose();
+    setChangePasswordOpen(true);
+  };
+
   const unreadNotifications = notifications.length;
 
   const getPageTitle = (pathname: string): string => {
@@ -87,6 +95,34 @@ const TopBar: React.FC<TopBarProps> = ({ drawerWidth = 280 }) => {
         return 'Security Center';
       case '/agents':
         return 'Agent Management';
+      case '/content-processing':
+        return 'Content Processing';
+      case '/analytics':
+        return 'Analytics';
+      case '/personalization':
+        return 'Personalization';
+      case '/trends':
+        return 'Trends & Forecasting';
+      case '/search-intelligence':
+        return 'Search Intelligence';
+      case '/vision-studio':
+        return 'Vision AI Studio';
+      case '/audio-workstation':
+        return 'Audio AI Workstation';
+      case '/cross-modal-fusion':
+        return 'Cross-Modal Fusion';
+      case '/learning-adaptation':
+        return 'Learning & Adaptation';
+      case '/workflow-studio':
+        return 'Workflow Studio';
+      case '/integration-hub':
+        return 'Integration Hub';
+      case '/load-balancing':
+        return 'Load Balancing';
+      case '/collaboration':
+        return 'Collaboration';
+      case '/chat':
+        return 'AI Chat';
       case '/utilities':
         return 'Backend Tools';
       case '/settings':
@@ -223,11 +259,16 @@ const TopBar: React.FC<TopBarProps> = ({ drawerWidth = 280 }) => {
           
           <Divider sx={{ my: 1 }} />
           
+          <MenuItem onClick={handleChangePassword}>
+            <Lock sx={{ mr: 2, fontSize: 20 }} />
+            Change Password
+          </MenuItem>
+
           <MenuItem onClick={handleSettings}>
             <Settings sx={{ mr: 2, fontSize: 20 }} />
             Settings
           </MenuItem>
-          
+
           <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
             <Logout sx={{ mr: 2, fontSize: 20 }} />
             Logout
@@ -301,6 +342,14 @@ const TopBar: React.FC<TopBarProps> = ({ drawerWidth = 280 }) => {
           )}
         </Menu>
       </Toolbar>
+
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+        onSuccess={() => {
+          console.log('Password changed successfully from top bar');
+        }}
+      />
     </AppBar>
   );
 };
